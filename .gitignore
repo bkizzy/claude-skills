@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Editor noise
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Skill caches — raw scraped JSON is per-user, never committed
+*/reports/*.json
+*/reports/*.summary.json
+# Generated reports if someone runs /aaarrr while cwd'd into the repo (anchored to root)
+/aaarrr_*_[0-9]*.md
+
+# Local Claude state
+.claude/
