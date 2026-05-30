@@ -108,9 +108,13 @@ For iOS, after `asc_private_scrape.js`, also run `asc_public_scrape.js` against 
 
 ### Step 5 — Render
 
-Run `node {SKILL_DIR}/scripts/build_report.mjs --slug <slug> --window <mode> --out <cwd>/aaarrr_<slug>_<YYYYMMDD>.md` via Bash. The script finds today's JSONs in `{SKILL_DIR}/reports/`, merges them, and writes the Markdown file.
+Run `node {SKILL_DIR}/scripts/build_report_html.mjs --slug <slug> --window <mode> --out <cwd>/aaarrr_<slug>_<YYYYMMDD>.html` via Bash. The script finds today's JSONs in `{SKILL_DIR}/reports/`, merges them, and writes a standalone HTML file (no external assets — tables are semantic `<table>` so they paste cleanly into Notion / Slack / Sheets).
 
-After it runs, print the output path to the user with a one-line summary line: *"Report at <path>. Top mover: <metric> <delta>."* (The script writes a `__summary` JSON file alongside the Markdown that has the top mover so you can quote it.)
+Pass `--date YYYYMMDD` if the user is regenerating an older day; the script defaults to today's **local** date (not UTC — local avoids the post-8pm-EDT flip that would miss the JSON cached earlier the same evening).
+
+After it runs, print the output path to the user with a one-line summary: *"Report at <path>. Top mover: <metric> <delta>."* (The script writes a `<path>.summary.json` sidecar with the top movers so you can quote them.)
+
+The Markdown renderer (`build_report.mjs`) is still available for terminal-friendly output but is no longer the default.
 
 ### Step 6 — Surface
 

@@ -29,7 +29,7 @@ Then in Claude Code, restart the session (`/clear`) and invoke:
 | `/aaarrr MyApp --refresh` | Force re-scrape even if cache < 1h old. |
 | `/aaarrr MyApp --report-only` | Skip the browser entirely; re-render from cached JSON. |
 
-Report drops in your current working directory as `aaarrr_<slug>_<YYYYMMDD>.md`. Raw per-store JSON is cached in `reports/` for an hour.
+Report drops in your current working directory as `aaarrr_<slug>_<YYYYMMDD>.html` — a standalone single-file HTML report with semantic tables that paste cleanly into Notion, Slack, Sheets, or Linear. Raw per-store JSON is cached in `reports/` for an hour. (A Markdown renderer is also available at `scripts/build_report.mjs` for terminal-friendly output.)
 
 ## Requirements
 
@@ -76,7 +76,8 @@ aaarrr/
 │   ├── asc_private_scrape.js      # App Store Connect scraper (injected via javascript_tool)
 │   ├── asc_public_scrape.js       # apps.apple.com page scraper
 │   ├── play_scrape.js             # Play Console scraper
-│   └── build_report.mjs           # Node — merges JSON, emits Markdown
+│   ├── build_report_html.mjs      # Node — merges JSON, emits standalone HTML (default)
+│   └── build_report.mjs           # Node — merges JSON, emits Markdown (legacy)
 ├── references/
 │   ├── aaarrr_mapping.md          # pillar ↔ dashboard-field mapping (schema source of truth)
 │   └── selectors.md               # DOM selectors + endpoint paths + patching procedure

@@ -203,12 +203,16 @@
       const yDate = cfg.dates.yesterday.date;
       const dbDate = dayBeforeDate(yDate);
       const f = isRate ? avgRange : sumRange;
+      // ASC returns rate measures as percentages (e.g. 19.45 means 19.45%, not
+      // 1945%). The shared schema expects fractions (0–1) so the renderer can
+      // format with a single rule. Normalize here on intake.
+      const scale = isRate ? (v) => (v == null ? null : v / 100) : (v) => v;
       return {
-        "7d":         f(series, cfg.dates.rolling_7d.start,   cfg.dates.rolling_7d.end,   measure),
-        "prior_7d":   f(series, cfg.dates.prior_7d.start,     cfg.dates.prior_7d.end,     measure),
-        "28d":        f(series, cfg.dates.baseline_28d.start, cfg.dates.baseline_28d.end, measure),
-        "yesterday":  pointOn(series, yDate,  measure),
-        "day_before": pointOn(series, dbDate, measure),
+        "7d":         scale(f(series, cfg.dates.rolling_7d.start,   cfg.dates.rolling_7d.end,   measure)),
+        "prior_7d":   scale(f(series, cfg.dates.prior_7d.start,     cfg.dates.prior_7d.end,     measure)),
+        "28d":        scale(f(series, cfg.dates.baseline_28d.start, cfg.dates.baseline_28d.end, measure)),
+        "yesterday":  scale(pointOn(series, yDate,  measure)),
+        "day_before": scale(pointOn(series, dbDate, measure)),
         _series: series, // kept for derived-metric computation; stripped before return
       };
     } catch (e) {
