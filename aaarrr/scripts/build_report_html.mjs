@@ -165,20 +165,46 @@ function row(label, pluck, opts = {}) {
 }
 
 // --- sections ----------------------------------------------------------------
+function shortDate(s) { // "2026-05-28" -> "May 28"
+  if (!s) return "";
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${months[+m[2]-1]} ${+m[3]}` : s;
+}
+function storeWindows(store) {
+  if (!store?.windows) return null;
+  const w = store.windows;
+  return {
+    yesterday: w.yesterday?.date,
+    dayBefore: w.yesterday?.date ? (() => { const d = new Date(w.yesterday.date + "T00:00:00Z"); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); })() : null,
+    rolling7d: w.rolling_7d ? `${shortDate(w.rolling_7d.start)}–${shortDate(w.rolling_7d.end)}` : "",
+    prior7d:   w.prior_7d   ? `${shortDate(w.prior_7d.start)}–${shortDate(w.prior_7d.end)}` : "",
+    baseline28d: w.baseline_28d ? `${shortDate(w.baseline_28d.start)}–${shortDate(w.baseline_28d.end)}` : "",
+    yest: w.yesterday?.date ? shortDate(w.yesterday.date) : "",
+    lagNote: w.data_lag_note || null,
+  };
+}
+const iosW = storeWindows(ios);
+const andW = storeWindows(android);
+
 function table(rows) {
+  // Tooltip-style hint on each column header that names the actual dates.
+  const iosT = iosW || {};
+  const andT = andW || {};
+  const tt = (s) => s ? ` title="${escapeHtml(s)}"` : "";
   return `
 <div class="table-wrap">
   <table>
     <thead>
       <tr>
         <th class="lbl"></th>
-        <th colspan="4" class="store-head ios">iOS</th>
-        <th colspan="4" class="store-head android">Android</th>
+        <th colspan="4" class="store-head ios">iOS ${iosT.rolling7d ? `<span class="dates">· ${escapeHtml(iosT.rolling7d)}</span>` : ""}</th>
+        <th colspan="4" class="store-head android">Android ${andT.rolling7d ? `<span class="dates">· ${escapeHtml(andT.rolling7d)}</span>` : ""}</th>
       </tr>
       <tr>
         <th class="lbl">Metric</th>
-        <th>7d</th><th>DoD</th><th>WoW</th><th>28d avg</th>
-        <th>7d</th><th>DoD</th><th>WoW</th><th>28d avg</th>
+        <th${tt(iosT.rolling7d)}>7d</th><th${tt(iosT.yest && iosT.dayBefore ? `${shortDate(iosT.yest)} vs ${shortDate(iosT.dayBefore)}` : "")}>DoD</th><th${tt(iosT.rolling7d && iosT.prior7d ? `${iosT.rolling7d} vs ${iosT.prior7d}` : "")}>WoW</th><th${tt(iosT.baseline28d)}>28d avg</th>
+        <th${tt(andT.rolling7d)}>7d</th><th${tt(andT.yest && andT.dayBefore ? `${shortDate(andT.yest)} vs ${shortDate(andT.dayBefore)}` : "")}>DoD</th><th${tt(andT.rolling7d && andT.prior7d ? `${andT.rolling7d} vs ${andT.prior7d}` : "")}>WoW</th><th${tt(andT.baseline28d)}>28d avg</th>
       </tr>
     </thead>
     <tbody>${rows.join("")}</tbody>
@@ -340,6 +366,18 @@ function storeBanners() {
   return out.join("");
 }
 
+function windowsBanner() {
+  if (!iosW && !andW) return "";
+  const rows = [];
+  if (iosW) rows.push(`<div><span class="ios">iOS</span> · 7d <strong>${escapeHtml(iosW.rolling7d)}</strong> · prior <strong>${escapeHtml(iosW.prior7d)}</strong> · 28d <strong>${escapeHtml(iosW.baseline28d)}</strong> · DoD ${escapeHtml(iosW.yest)} vs ${escapeHtml(shortDate(iosW.dayBefore))}</div>`);
+  if (andW) rows.push(`<div><span class="android">Android</span> · 7d <strong>${escapeHtml(andW.rolling7d)}</strong> · prior <strong>${escapeHtml(andW.prior7d)}</strong> · 28d <strong>${escapeHtml(andW.baseline28d)}</strong> · DoD ${escapeHtml(andW.yest)} vs ${escapeHtml(shortDate(andW.dayBefore))}</div>`);
+  let lag = "";
+  if (andW?.lagNote || (iosW && andW && iosW.yest !== andW.yest)) {
+    lag = `<div class="lag-note small muted">Note: ${iosW && andW && iosW.yest !== andW.yest ? `Android trails iOS by a few days — Play finalizes daily data with a lag.` : "Android data ends earlier than iOS."}</div>`;
+  }
+  return `<div class="windows-banner">${rows.join("")}${lag}</div>`;
+}
+
 function publicAppleStrip() {
   if (!ios?.asc_public) return "";
   const p = ios.asc_public;
@@ -421,6 +459,11 @@ const html = `<!DOCTYPE html>
   .meta { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
   .public-strip { font-size: 13px; color: var(--muted); margin: 0 0 16px; padding: 8px 12px; background: white; border: 1px solid var(--line); border-radius: 6px; }
   .public-strip strong { color: var(--fg); }
+  .windows-banner { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; color: var(--fg); }
+  .windows-banner strong { font-variant-numeric: tabular-nums; }
+  .windows-banner .ios { color: var(--ios); font-weight: 600; display: inline-block; min-width: 60px; }
+  .windows-banner .android { color: var(--android); font-weight: 600; display: inline-block; min-width: 60px; }
+  .windows-banner .lag-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
   .banner { padding: 10px 14px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
   .banner.warn { background: var(--warn-bg); color: var(--warn-fg); }
   .banner.info { background: var(--info-bg); color: var(--info-fg); }
@@ -448,6 +491,7 @@ const html = `<!DOCTYPE html>
   thead th.store-head { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg); background: #ebebe5; }
   thead th.store-head.ios { color: var(--ios); }
   thead th.store-head.android { color: var(--android); }
+  thead th.store-head .dates { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; text-transform: none; margin-left: 6px; }
   tbody tr:nth-child(odd) { background: #fbfbf8; }
   tbody tr:hover { background: #f3f3ee; }
   th.lbl { font-weight: 500; color: var(--fg); }
@@ -510,6 +554,7 @@ const html = `<!DOCTYPE html>
   <h1>AAARRR — ${escapeHtml(appName)}</h1>
   <p class="meta">Generated ${generated} · Window: ${escapeHtml(windowMode)} · iOS ${ios ? "✓" : "—"} · Android ${android ? "✓" : "—"}</p>
   ${storeBanners()}
+  ${windowsBanner()}
   ${publicAppleStrip()}
   ${topCalloutHtml()}
   ${tocHtml}
