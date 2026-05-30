@@ -1,0 +1,201 @@
+{
+  "store": "google_play",
+  "app": "Ferndale Field Guide",
+  "windows": {
+    "yesterday": {
+      "date": "2026-06-10"
+    },
+    "rolling_7d": {
+      "start": "2026-06-04",
+      "end": "2026-06-10"
+    },
+    "prior_7d": {
+      "start": "2026-05-28",
+      "end": "2026-06-03"
+    },
+    "baseline_28d": {
+      "start": "2026-05-14",
+      "end": "2026-06-10"
+    },
+    "data_lag_note": "Play chart data ends 2026-06-10 (4-day finalization lag vs Apple's 2026-06-14)."
+  },
+  "app_meta": {
+    "package_name": "com.example.fieldguide",
+    "name": "Ferndale Field Guide"
+  },
+  "awareness": {
+    "impressions": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "page_views": {
+      "7d": 1080,
+      "prior_7d": 776,
+      "28d": 4180,
+      "yesterday": 199,
+      "day_before": 137
+    }
+  },
+  "acquisition": {
+    "first_downloads": {
+      "7d": 159,
+      "prior_7d": 173,
+      "28d": 610,
+      "yesterday": 38,
+      "day_before": 16
+    },
+    "redownloads": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "conversion_rate": {
+      "7d": 0.1544,
+      "prior_7d": 0.2383,
+      "28d": 0.1659,
+      "yesterday": 0.191,
+      "day_before": 0.1168
+    },
+    "top_sources": [
+      {
+        "name": "Play Store (organic search)",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Play Store (browse)",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Third-party referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      }
+    ]
+  },
+  "activation": {
+    "active_devices": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": 1840,
+      "yesterday": null,
+      "day_before": null
+    },
+    "sessions": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": 920,
+      "yesterday": null,
+      "day_before": null
+    },
+    "sessions_per_device": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "crashes": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": 2,
+      "yesterday": null,
+      "day_before": null
+    }
+  },
+  "retention": {
+    "d1": null,
+    "d7": 0.27,
+    "d14": null,
+    "d28": null
+  },
+  "revenue": {
+    "proceeds_usd": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "iap_count": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "active_subs": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "arpu": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": 3.42,
+      "yesterday": null,
+      "day_before": null
+    },
+    "paying_users": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    }
+  },
+  "referral": {
+    "by_source": [
+      {
+        "name": "Play Store (organic search)",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Play Store (browse)",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Third-party referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      }
+    ]
+  },
+  "ratings": {
+    "avg": 4.4,
+    "count": 218,
+    "new_yesterday": null,
+    "recent_reviews": [
+      {
+        "rating": 5,
+        "title": "",
+        "body": "Excellent for a family hike \u2014 the kids love the photo-based plant ID.",
+        "date": "2026-06-09",
+        "author": "M. Henderson"
+      },
+      {
+        "rating": 3,
+        "title": "",
+        "body": "Maps are great but I wish I could export sightings to a CSV.",
+        "date": "2026-06-08",
+        "author": "Sarah K."
+      }
+    ]
+  },
+  "errors": [
+    "play.impressions: not exposed by Play Console (Acquisition reports \u2192 Store performance is closest)",
+    "play.active_subs: not yet mapped in v1",
+    "play.proceeds: chart values are SVG-rendered on /reporting/finance/revenue \u2014 sweep with chart-hover technique if needed",
+    "play.retention.d1.d14.d28: only d7 surfaced as headline; deeper cohorts require chart sweep"
+  ]
+}

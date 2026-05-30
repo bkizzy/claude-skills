@@ -53,7 +53,8 @@ Parse the arguments. Establish:
 - `refresh` (bool, default false)
 - `reportOnly` (bool, default false)
 
-Compute the four window date ranges from today (today is the day the skill runs; use absolute dates in JSON):
+**Get today's real date from the system clock** by running `date +%Y-%m-%d` via Bash. Do NOT trust "today's date" from session context — it can be stale. Compute window date ranges from that:
+
 - `yesterday` = today − 1
 - `rolling_7d` = [today − 7, today − 1]
 - `prior_7d`   = [today − 14, today − 8]
@@ -85,26 +86,43 @@ For each store in scope, look in `{SKILL_DIR}/reports/<slug>_<store>_<YYYYMMDD>.
 
 ### Step 4 — Scrape
 
-Load the per-store scraper from `{SKILL_DIR}/scripts/`:
-- iOS private: `asc_private_scrape.js`
-- iOS public:  `asc_public_scrape.js`
-- Android:     `play_scrape.js`
+The two stores need different strategies:
 
-Each script is a self-contained async IIFE that returns a JSON object matching the shared schema (see `references/aaarrr_mapping.md`). Inject via `mcp__Claude_in_Chrome__javascript_tool`, passing the script body and the window dates as a JSON-stringified `window.__aaarrrCfg` setup line prefixed to the script body.
+#### iOS — single-shot IIFE
+`asc_private_scrape.js` is a self-contained async IIFE. Inject via `mcp__Claude_in_Chrome__javascript_tool`, prepending `window.__aaarrrCfg = {...}` with the app name, optional `forceAppId`, and the four window dates. The scraper XHR-replays App Store Connect's internal `/analytics/api/v1/data/time-series` endpoint in parallel for every measure. One round-trip in, one returned JSON out.
 
-**Speed:** these scrapers prefer XHR-replay over DOM scraping where the dashboard exposes a JSON endpoint. They run concurrent requests via `Promise.all` inside the page. One MCP round-trip per page, not per metric.
+App resolution order: `forceAppId` → URL-embedded id → exact name match → single substring → multiple substrings (returns `{ error: "ambiguous_app", candidates: [...] }`, ask the user to pick via `AskUserQuestion`). After resolution, run `asc_public_scrape.js` against `https://apps.apple.com/us/app/id<APP_STORE_ID>` to fetch public-page rating, rank, and editorial state. Merge under `asc_public`.
 
-**Failure tolerance:** if a selector misses or an endpoint 4xx's, the scraper records `null` for that field and pushes a string to the returned `errors` array. Never throw. The renderer turns `null` into `—` with a footnote.
+#### Android — interactive, two-tier
+Play Console renders chart data on `<canvas>` elements with no text/aria fallback, so a single-shot scraper isn't possible. `play_scrape.js` exposes helper functions Claude calls between navigations.
+
+**Tier 1 (fast — gets all five AAARRR pillars at 28-day grain):**
+1. Navigate to `/console/u/0/developers/<devId>/app-list`.
+2. Inject `play_scrape.js`; call `window.aaarrrPlayProbe()` to confirm signed-in past the dev-account chooser.
+3. Call `window.aaarrrPlayFindApp(<app>)` to resolve to `{ packageId, text }`. Same ambiguity handling as iOS.
+4. Navigate to `/console/.../app/<packageId>/grow-overview`.
+5. Call `window.aaarrrPlayGrowOverview()` — returns 28-day totals for device acquisitions, first opens, MAU, 7-day retention, conversion rate, plus the dashboard's own `+N%` deltas.
+6. Navigate to `/console/.../app/<packageId>/user-feedback/ratings` and call `window.aaarrrPlayRatings()`.
+7. Save the Play JSON. The renderer fills 28d cells from these headline numbers via the "promote 28d into primary cell" fallback.
+
+**Tier 2 (optional — adds per-day chips):**
+Only run if the user explicitly asks for daily DoD/WoW chips on Play. For each chart of interest:
+1. Navigate to the relevant page (`/reporting/acquisition/details`, etc.).
+2. Call `window.aaarrrInstallChartObserver()` once.
+3. Call `window.aaarrrScrollPlayContent(<scrollTop>)` to bring the canvas into view.
+4. Call `window.aaarrrChartHoverGrid(<canvasIndex>)` to get a list of `[x, y]` viewport coordinates.
+5. Batch real hovers via `mcp__Claude_in_Chrome__computer { action: "hover" }` at each position (one `browser_batch` call covers all ~30).
+6. Call `window.aaarrrReadCaptures()` to get the daily series.
+
+**Speed:** Tier 1 = 3 navigations + 3 small JS reads per app, ~3K tokens total. Tier 2 = ~6K tokens per chart. The `/grow-overview` headlines cover all five AAARRR pillars at 28-day grain — only run Tier 2 if the user explicitly wants daily granularity.
+
+**Play data lag:** Play's chart values finalize 3–4 days after the day they refer to. The Play JSON's `windows` should record the actual data-end date (e.g. `yesterday: today-4`) so the report's window banner shows the correct iOS-vs-Android offset.
 
 After each store's scrape:
 1. Save raw JSON to `{SKILL_DIR}/reports/<slug>_<store>_<YYYYMMDD>.json`.
-2. If `errors` is non-empty, log a one-liner like *"⚠ apple_connect: 2 metrics unavailable (see report footnotes)"* but continue.
+2. If `errors` is non-empty, log a one-liner like *"⚠ apple_connect: 2 metrics unavailable"* but continue.
 
-For iOS, after `asc_private_scrape.js`, also run `asc_public_scrape.js` against `https://apps.apple.com/us/app/<id>` (the app's public page — get the App Store ID from the private scrape's `app_meta.app_store_id`). Merge its result under the private blob's `asc_public` key.
-
-**App not found in a store:** if `asc_private_scrape.js` can't locate the named app in the Connect apps list, save a stub JSON with `{ store, app, error: "app_not_found_in_store" }` and continue to the next store. The renderer will surface this in the report.
-
-**App is ambiguous in a store:** the scrapers resolve the app in this order — (1) `cfg.forceAppId`, (2) the App Store ID embedded in the current Connect URL if the user pre-navigated to `/apps/<id>/...`, (3) exact case-insensitive name match in `/iris/v1/apps`, (4) single substring match, (5) multiple substring matches → return `{ error: "ambiguous_app", candidates: [{id, name, bundleId, sku}, ...] }`. On (5), don't pick one yourself — ask the user via `AskUserQuestion` with the candidate names (and sku/bundle id for disambiguation) as options. Up to 4 options fit; if there are more, summarize the spillover in the question text. Recommended option is the candidate whose `sku` exactly equals the user's query (often the production app). On the user's reply, re-run the scraper with `forceAppId` set to the picked id; cache the JSON normally. (Alternative the user can choose: navigate the open tab to the desired app's Connect dashboard and reply "ready" — the scraper will pick up the id from the URL on the next run.)
+**App not found:** stub the JSON with `{ store, app, error: "app_not_found_in_store" }` and continue.
 
 ### Step 5 — Render
 

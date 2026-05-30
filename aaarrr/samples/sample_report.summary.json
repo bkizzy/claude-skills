@@ -1,0 +1,30 @@
+{
+  "app": "Ferndale Field Guide",
+  "generated_at": "2026-05-30T02:24:56.291Z",
+  "window": "rolling_7d",
+  "stores": [
+    "apple_connect",
+    "google_play"
+  ],
+  "mover_type": "dod",
+  "top_movers": [
+    {
+      "label": "Proceeds (USD) (iOS)",
+      "curr": 15,
+      "prev": 3,
+      "d": 4
+    },
+    {
+      "label": "First-time installs (iOS)",
+      "curr": 9,
+      "prev": 3,
+      "d": 2
+    },
+    {
+      "label": "First-time installs (Android)",
+      "curr": 38,
+      "prev": 16,
+      "d": 1.375
+    }
+  ]
+}

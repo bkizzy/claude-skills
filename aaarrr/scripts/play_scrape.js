@@ -1,228 +1,207 @@
-// Google Play Console scraper.
-// Runs in-page via Claude-in-Chrome `javascript_tool`. Requires the user to be
-// signed into play.google.com/console in the active tab.
+// Google Play Console helper library.
 //
-// Play Console is a Closure-compiled SPA; its dashboards are powered by
-// "batchexecute" RPC calls to /console/api/{...}. The exact RPC IDs change
-// occasionally. This scraper attempts the documented Reporting-API where
-// possible (Android Vitals only), and otherwise pulls visible numbers from
-// the rendered DOM via a known set of card selectors.
+// Unlike the App Store Connect scraper (which is a single IIFE that pulls
+// everything from one well-documented JSON endpoint), Play Console doesn't
+// expose a single data source. The chart values are rendered to <canvas>
+// elements with no text or aria fallback. The path that actually works is:
 //
-// Config: window.__aaarrrCfg = { app: "MyApp", dates: { yesterday, rolling_7d, prior_7d, baseline_28d } }
+//   1. Navigate to /grow-overview — text-rendered headline 28d numbers
+//      (device acquisitions, MAU, first opens, 7d retention, conversion).
+//      This is the fast win — no chart hovering required.
+//   2. For per-day breakdowns, navigate to chart-bearing pages
+//      (/reporting/acquisition/details, /vitals/crashes, etc.) and SWEEP
+//      each canvas: real mouse hovers across the chart's x-axis trigger
+//      Google's aria-live announcement
+//          "<YYYY-MM-DD> 00:00:00.000: <series> is <value>."
+//      A MutationObserver scrapes those announcements as they fire.
 //
-// Returns the shared AAARRR JSON shape. Per-metric failures → null + errors[].
+// This file exposes the helpers Claude calls from the SKILL. It is NOT a
+// standalone IIFE — the skill orchestrates navigation, scroll, and hover
+// between calls.
 
-(async () => {
-  const cfg = window.__aaarrrCfg || {};
-  const errors = [];
-  const log = (m) => errors.push(m);
-  const blank = () => ({ "7d": null, "prior_7d": null, "28d": null, "yesterday": null, "day_before": null });
+// ---------------------------------------------------------------------------
+// Public-page URL stems and routes (verified May 2026, see selectors.md)
+// ---------------------------------------------------------------------------
+const PLAY_PATHS = {
+  appsList:      "/console/u/0/developers/<devId>/app-list",
+  appDashboard:  "/console/u/0/developers/<devId>/app/<pkg>/app-dashboard",
+  growOverview:  "/console/u/0/developers/<devId>/app/<pkg>/grow-overview",
+  statistics:    "/console/u/0/developers/<devId>/app/<pkg>/statistics",
+  vitalsCrashes: "/console/u/0/developers/<devId>/app/<pkg>/vitals/crashes",
+  financeOver:   "/console/u/0/developers/<devId>/app/<pkg>/reporting/finance/overview",
+  financeRev:    "/console/u/0/developers/<devId>/app/<pkg>/reporting/finance/revenue",
+  acquisition:   "/console/u/0/developers/<devId>/app/<pkg>/reporting/acquisition/details",
+  ratings:       "/console/u/0/developers/<devId>/app/<pkg>/user-feedback/ratings",
+  reviews:       "/console/u/0/developers/<devId>/app/<pkg>/user-feedback/reviews",
+};
+const STATS_METRIC_KEYS = {
+  DEVICE_ACQUISITION: "DEVICE_ACQUISITION-ALL-EVENTS-PER_INTERVAL-DAY",
+  ACTIVE_USERS:       "ACTIVE_USERS-ALL-UNIQUE-PER_INTERVAL-DAY",
+  RETENTION:          "ENGAGEMENT_RETENTION_BY_DEVICE-ACQUISITION_UNSPECIFIED-COUNT_UNSPECIFIED-PER_INTERVAL-DAY",
+  FIRST_OPENS:        "FIRST_OPENS_BY_DEVICE-ACQUISITION_UNSPECIFIED-COUNT_UNSPECIFIED-PER_INTERVAL-DAY",
+};
 
-  const result = {
-    store: "google_play",
-    app: cfg.app || null,
-    windows: cfg.dates || null,
-    app_meta: { package_name: null, name: null },
-    awareness:   { impressions: blank(), page_views: blank() },
-    acquisition: { first_downloads: blank(), redownloads: blank(), conversion_rate: blank(), top_sources: [] },
-    activation:  { active_devices: blank(), sessions: blank(), sessions_per_device: blank(), crashes: blank() },
-    retention:   { d1: null, d7: null, d14: null, d28: null },
-    revenue:     { proceeds_usd: blank(), iap_count: blank(), active_subs: blank(), arpu: blank() },
-    referral:    { by_source: [] },
-    ratings:     { avg: null, count: null, new_yesterday: null, recent_reviews: [] },
-    errors,
+// ---------------------------------------------------------------------------
+// 1. Detection probe — call after navigate() to confirm the page is ready.
+//    Returns { ready: boolean, reason: string }. "Ready" is stricter than
+//    "signed in": it means the apps list (or an app sub-page) is actually
+//    rendered, not the dev-account chooser or 2FA prompt.
+// ---------------------------------------------------------------------------
+window.aaarrrPlayProbe = () => ({
+  ready:
+    location.hostname.includes("play.google.com") &&
+    location.pathname.includes("/console/u/") &&
+    !location.hostname.includes("accounts.google.com") &&
+    // past /developers/ — i.e. inside a dev account, not the chooser
+    /\/developers\/\d+/.test(location.pathname) &&
+    // app list rows are in the DOM
+    !!document.querySelector('a[href*="/app/"]'),
+  reason: document.title || location.pathname,
+});
+
+// ---------------------------------------------------------------------------
+// 2. Headline 28d numbers from /grow-overview — the cheapest scrape path.
+//    Returns { device_acquisitions, first_opens, mau, retention_d7,
+//              conversion_rate, deltas } as 28-day aggregates with WoW%.
+//    Call AFTER navigating to PLAY_PATHS.growOverview and waiting for it.
+// ---------------------------------------------------------------------------
+window.aaarrrPlayGrowOverview = () => {
+  const t = (document.body.innerText || "").replace(/\s+/g, " ");
+  // Pattern: each card emits "<Label> <value> arrow_right_alt +N% delta ..."
+  // The deltas are in plain text "+78% delta, where an increase is good".
+  const grab = (label) => {
+    const re = new RegExp(label + "\\s+([\\d,.]+(?:%)?)\\s+arrow_(?:right|left)_alt\\s+([+-]?\\d+)%", "i");
+    const m = t.match(re);
+    if (!m) return { value: null, delta_pct: null };
+    const raw = m[1];
+    const value = raw.endsWith("%") ? Number(raw.slice(0, -1)) / 100 : Number(raw.replace(/,/g, ""));
+    return { value, delta_pct: Number(m[2]) };
   };
+  // "Your conversion rate is X%" is shown separately at the bottom.
+  const convMatch = t.match(/conversion rate is\s+([\d.]+)%/i);
+  return {
+    device_acquisitions: grab("Device acquisitions"),
+    first_opens:         grab("First opens"),
+    mau:                 grab("MAU"),
+    retention_d7:        grab("7-day retention"),
+    conversion_rate:     convMatch ? { value: Number(convMatch[1]) / 100, delta_pct: null } : { value: null, delta_pct: null },
+  };
+};
 
-  if (!cfg.app || !cfg.dates) {
-    log("missing __aaarrrCfg — invoke with app + dates");
-    return result;
+// ---------------------------------------------------------------------------
+// 3. App finder — walk the dev's apps list to map a name -> { packageId, name }.
+//    Call AFTER navigating to PLAY_PATHS.appsList.
+// ---------------------------------------------------------------------------
+window.aaarrrPlayFindApp = (queryName) => {
+  const q = (queryName || "").toLowerCase().trim();
+  const rows = Array.from(document.querySelectorAll('a[href*="/app/"]'));
+  const seen = new Map(); // packageId -> { row text, packageId }
+  for (const a of rows) {
+    const h = a.getAttribute("href") || "";
+    const m = h.match(/\/app\/(\d+)/);
+    if (!m) continue;
+    const packageId = m[1];
+    if (seen.has(packageId)) continue;
+    const container = a.closest("tr, [role='row'], li, [class*='row']") || a.parentElement;
+    const text = (container?.innerText || "").replace(/\s+/g, " ").trim();
+    seen.set(packageId, { packageId, text });
   }
+  const all = Array.from(seen.values());
+  const exact = all.filter((r) => r.text.toLowerCase().includes(q));
+  if (!exact.length) return { error: "app_not_found", candidates: all };
+  if (exact.length > 1) return { error: "ambiguous_app", candidates: exact };
+  return exact[0];
+};
 
-  // --- 1. Find package name for the app -----------------------------------
-  // Strategy: parse the apps list from the side-nav or the All apps page.
-  // The selector `[data-app-id]` is stable across the chrome shell; failing
-  // that, fall back to matching anchor titles against cfg.app.
-  function findPackageName(name) {
-    const wanted = name.toLowerCase().trim();
-    // Candidate 1: any app row with data attributes
-    const rows = document.querySelectorAll('[data-app-id], [data-package-name]');
-    for (const r of rows) {
-      const label = (r.textContent || r.getAttribute('aria-label') || '').toLowerCase();
-      if (label.includes(wanted)) {
-        return r.getAttribute('data-package-name') || r.getAttribute('data-app-id') || null;
+// ---------------------------------------------------------------------------
+// 4. Ratings overview — from /user-feedback/ratings, text is inlined.
+//    Returns { default_rating, recent_avg, raters, peer_median }.
+// ---------------------------------------------------------------------------
+window.aaarrrPlayRatings = () => {
+  const t = (document.body.innerText || "").replace(/\s+/g, " ");
+  const defaultR = t.match(/([\d.]+)\s*star\s+Default Google Play rating/);
+  const recent   = t.match(/([\d.]+)\s*star\s+Average rating \(last 28 days\)/);
+  const raters   = t.match(/Users\s+(\d+)/);
+  const peer     = t.match(/([\d.]+)\s*star\s+Peers' median/);
+  return {
+    default_rating: defaultR ? Number(defaultR[1]) : null,
+    recent_avg:     recent   ? Number(recent[1])   : null,
+    raters:         raters   ? Number(raters[1])   : null,
+    peer_median:    peer     ? Number(peer[1])     : null,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// 5. Chart-hover infrastructure — install the observer BEFORE the sweep.
+//    Captures every announcement of shape "<date> 00:00:00.000: <series> is <n>"
+//    that fires while the cursor moves across a chart canvas.
+// ---------------------------------------------------------------------------
+window.aaarrrInstallChartObserver = () => {
+  window.__chartCaptures = [];
+  if (window.__chartObserver) window.__chartObserver.disconnect();
+  window.__chartObserver = new MutationObserver(() => {
+    const t = document.body.innerText || "";
+    const matches = Array.from(t.matchAll(/(20\d\d-\d\d-\d\d) 00:00:00\.000: ([^:]+?) is (\d+(?:\.\d+)?)/g));
+    for (const m of matches) {
+      const k = m[1] + "|" + m[2].trim() + "|" + m[3];
+      if (!window.__chartCaptures.find((c) => c.k === k)) {
+        window.__chartCaptures.push({ k, date: m[1], series: m[2].trim(), value: Number(m[3]) });
       }
     }
-    // Candidate 2: links of shape /console/u/0/developers/{devId}/app/{pkgHash}/...
-    const links = document.querySelectorAll('a[href*="/app/"]');
-    for (const a of links) {
-      if ((a.textContent || '').toLowerCase().includes(wanted)) {
-        const m = a.getAttribute('href').match(/\/app\/([^/]+)/);
-        if (m) return m[1];
-      }
-    }
-    return null;
-  }
+  });
+  window.__chartObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  return "observer-armed";
+};
 
-  let pkg = findPackageName(cfg.app);
-  if (!pkg) {
-    // Try navigating to the all-apps page once and re-checking.
-    try {
-      const here = location.href;
-      const isAppsList = here.includes('/developers/') && !here.includes('/app/');
-      if (!isAppsList) {
-        log('not on apps-list page — open /console/u/0/developers/<id>/app-list and re-run');
-      }
-    } catch {}
-    result.error = "app_not_found_in_store";
-    log(`no Play Console app matching "${cfg.app}"`);
-    return result;
-  }
-  result.app_meta.package_name = pkg;
-  result.app_meta.name = cfg.app;
+// ---------------------------------------------------------------------------
+// 6. Chart coordinates — call AFTER the page settles to compute the x-axis
+//    hover positions. Returns absolute viewport coordinates suitable for
+//    feeding into Claude-in-Chrome's `computer.hover` action.
+//
+//    The chart canvas is typically 600x260 with 28 daily points. We sample
+//    at slightly higher density (default 30 positions across 600px) so each
+//    daily point is hit even with small layout shifts.
+// ---------------------------------------------------------------------------
+window.aaarrrChartHoverGrid = (canvasIndex = 0, samples = 30) => {
+  const c = document.querySelectorAll("canvas")[canvasIndex];
+  if (!c) return { error: "no-canvas-at-index" };
+  const r = c.getBoundingClientRect();
+  if (r.width === 0) return { error: "canvas-not-visible (scroll the inner .main-content into view first)" };
+  const y = Math.round(r.top + r.height / 2);
+  const stepX = r.width / (samples - 1);
+  const positions = [];
+  for (let i = 0; i < samples; i++) positions.push([Math.round(r.left + i * stepX), y]);
+  return { canvasIndex, x_range: [Math.round(r.left), Math.round(r.left + r.width)], y, positions };
+};
 
-  // --- 2. Pull metrics ----------------------------------------------------
-  // Play Console doesn't expose a single tidy JSON endpoint like Apple's
-  // analytics API — it's batch-RPC. We do two things in parallel:
-  //   (a) Hit the Play Developer Reporting API for Android Vitals (crashes)
-  //       via the same cookies (works if the user has an active session).
-  //   (b) Pull DOM-rendered numbers by visiting the Statistics page in an
-  //       iframe and reading the cards.
-  // For v1, (b) is the path most metrics use. The DOM-reader runs after a
-  // brief settle period so charts have rendered.
+// ---------------------------------------------------------------------------
+// 7. Read the observer's captures, filtered to a series of interest.
+//    The conversion-rate chart has a "Peers' median" series too — pass
+//    excludePeers: true to skip it. Returns a sorted array of {date, value}.
+// ---------------------------------------------------------------------------
+window.aaarrrReadCaptures = (opts = {}) => {
+  const { excludePeers = true } = opts;
+  const raw = window.__chartCaptures || [];
+  const filtered = excludePeers ? raw.filter((c) => c.series.indexOf("Peers") === -1) : raw;
+  // Deduplicate by date, keeping the first value seen.
+  const byDate = new Map();
+  for (const c of filtered) if (!byDate.has(c.date)) byDate.set(c.date, c.value);
+  return [...byDate.entries()].sort().map(([date, value]) => ({ date, value }));
+};
 
-  async function navAndRead(path, readFn, settleMs = 1500) {
-    // Open the target route in a hidden iframe in the same origin.
-    return new Promise((resolve) => {
-      const ifr = document.createElement('iframe');
-      ifr.style.cssText = 'width:1280px;height:900px;position:fixed;left:-9999px;top:0;border:0;';
-      ifr.src = path;
-      ifr.onload = () => {
-        setTimeout(() => {
-          try {
-            const r = readFn(ifr.contentDocument || ifr.contentWindow.document);
-            resolve(r);
-          } catch (e) {
-            log(`navAndRead(${path}): ${e.message}`);
-            resolve(null);
-          } finally {
-            ifr.remove();
-          }
-        }, settleMs);
-      };
-      document.body.appendChild(ifr);
-      // Hard timeout.
-      setTimeout(() => { ifr.remove(); resolve(null); }, 15000);
-    });
-  }
+// ---------------------------------------------------------------------------
+// 8. Inner-scroller helper — Play Console renders inside a fixed-position
+//    .main-content div, so window.scrollTo() doesn't bring later charts into
+//    view. Use this helper to scroll the right container.
+// ---------------------------------------------------------------------------
+window.aaarrrScrollPlayContent = (scrollTop) => {
+  const s = document.querySelector(".main-content");
+  if (!s) return { error: "no-main-content-scroller" };
+  s.scrollTop = scrollTop;
+  return { scrolled_to: s.scrollTop };
+};
 
-  // Card readers — Play Console renders each stat as a card with a label
-  // and a big number. The exact class names rotate, so we look for accessible
-  // labels first.
-  function readCardValue(doc, labelRe) {
-    const cards = doc.querySelectorAll('[role="article"], .stat-card, [data-card]');
-    for (const c of cards) {
-      const label = c.querySelector('[role="heading"], .card-title, .stat-label')?.textContent || '';
-      if (labelRe.test(label)) {
-        const v = c.querySelector('.stat-value, [data-stat-value], .primary-value')?.textContent || '';
-        const num = Number(v.replace(/[^\d.\-]/g, ''));
-        return isNaN(num) ? null : num;
-      }
-    }
-    return null;
-  }
-
-  const devId = (location.pathname.match(/\/developers\/(\d+)/) || [])[1];
-  const appBase = devId ? `/console/u/0/developers/${devId}/app/${pkg}` : null;
-
-  // Kick the pulls in parallel.
-  const [stats, vitals, ratings, retention] = await Promise.all([
-    appBase ? navAndRead(`${appBase}/statistics`, (d) => ({
-      first_downloads: readCardValue(d, /first[- ]?time install/i),
-      active_devices:  readCardValue(d, /active devices/i),
-      uninstalls:      readCardValue(d, /uninstalls?/i),
-      conversion_rate: readCardValue(d, /store listing conversion/i),
-    })) : null,
-    appBase ? navAndRead(`${appBase}/vitals/overview`, (d) => ({
-      crash_rate: readCardValue(d, /crash rate/i),
-      anr_rate:   readCardValue(d, /anr rate/i),
-    })) : null,
-    appBase ? navAndRead(`${appBase}/user-feedback/reviews`, (d) => {
-      const avgEl = d.querySelector('.rating-overview-value, [data-test="overall-rating"]');
-      const countEl = d.querySelector('.rating-overview-count, [data-test="rating-count"]');
-      const rows = d.querySelectorAll('.review-row, [role="listitem"]');
-      const recent = [...rows].slice(0, 5).map((r) => ({
-        rating: Number((r.querySelector('[aria-label*="star"]')?.getAttribute('aria-label') || '').match(/\d+/)?.[0]) || null,
-        title:  (r.querySelector('.review-title, [data-test="review-title"]')?.textContent || '').trim(),
-        body:   (r.querySelector('.review-body, [data-test="review-body"]')?.textContent || '').trim().slice(0, 280),
-        date:   (r.querySelector('time')?.getAttribute('datetime') || '').slice(0, 10),
-      }));
-      return {
-        avg:   Number((avgEl?.textContent || '').replace(/[^\d.]/g, '')) || null,
-        count: Number((countEl?.textContent || '').replace(/[^\d]/g, '')) || null,
-        recent,
-      };
-    }) : null,
-    appBase ? navAndRead(`${appBase}/statistics?ts_view=retention`, (d) => {
-      // Play renders retained-users as a line chart; pull the latest cohort
-      // values from the legend/table view if present.
-      const cells = d.querySelectorAll('.retention-cell, [data-day]');
-      const pick = (n) => {
-        for (const c of cells) {
-          if (Number(c.getAttribute('data-day')) === n) {
-            return Number((c.textContent || '').replace(/[^\d.]/g, '')) / 100 || null;
-          }
-        }
-        return null;
-      };
-      return { d1: pick(1), d7: pick(7), d14: pick(15), d28: pick(30) };
-    }) : null,
-  ]);
-
-  if (stats) {
-    if (stats.first_downloads != null) {
-      result.acquisition.first_downloads["7d"] = stats.first_downloads;
-    }
-    if (stats.active_devices != null) {
-      result.activation.active_devices["7d"] = stats.active_devices;
-    }
-    if (stats.conversion_rate != null) {
-      result.acquisition.conversion_rate["7d"] = stats.conversion_rate / 100;
-    }
-  } else log('play.stats: page read failed');
-
-  if (vitals?.crash_rate != null) {
-    result.activation.crashes["7d"] = vitals.crash_rate / 100;
-  }
-  if (ratings) {
-    result.ratings.avg = ratings.avg;
-    result.ratings.count = ratings.count;
-    result.ratings.recent_reviews = ratings.recent || [];
-  } else log('play.ratings: page read failed');
-  if (retention) result.retention = retention;
-
-  // Acquisition channels (Awareness/Referral): scrape the Acquisition reports page.
-  try {
-    const acq = appBase ? await navAndRead(`${appBase}/acquisition-reports/store-listing`, (d) => {
-      const rows = d.querySelectorAll('table tr, [role="row"]');
-      const out = [];
-      let total = 0;
-      for (const r of rows) {
-        const cells = r.querySelectorAll('td, [role="cell"]');
-        if (cells.length < 2) continue;
-        const name = (cells[0].textContent || '').trim();
-        const n = Number((cells[1].textContent || '').replace(/[^\d]/g, ''));
-        if (name && !isNaN(n)) {
-          out.push({ name, value: n });
-          total += n;
-        }
-      }
-      return out.slice(0, 6).map((r) => ({ name: r.name, share_7d: total ? r.value / total : null, share_prior_7d: null }));
-    }) : [];
-    result.acquisition.top_sources = acq || [];
-    result.referral.by_source     = acq || [];
-  } catch (e) {
-    log(`play.acquisition: ${e.message}`);
-  }
-
-  return result;
-})();
+// Expose path templates so the SKILL can build URLs.
+window.aaarrrPaths = PLAY_PATHS;
+window.aaarrrStatsMetrics = STATS_METRIC_KEYS;
+"play-helpers-loaded";

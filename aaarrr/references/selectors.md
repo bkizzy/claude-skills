@@ -114,22 +114,43 @@ The two text-friendly exceptions on the dashboard are:
 1. **`/grow-overview`** — 28d headlines in text.
 2. **`/statistics?metrics=ACTIVE_USERS-…`** with multi-country `dimensionValues` — renders a "Percentage of total" daily table in plain text. Other metrics on the same page do NOT, for reasons unclear.
 
-### Strategy for full coverage (out of scope v1)
+### Chart-hover sweep — the working per-day technique
 
-If you want per-day Play data without the canvas wall:
-- **Play Developer Reporting API** — official, OAuth, covers crashes, ANR, slow starts, wakelocks. Limited to vitals data. https://developers.google.com/play/developer/reporting
-- **Hover-and-capture** — script `mouseover` events at chart x-coordinates calculated from the date range. Brittle but works.
-- **Reverse the protobuf RPC** — the data lives in cross-origin POSTs to `playconsoleplatform-pa.clients6.google.com` with rotating `SAPISIDHASH` auth tokens. Complex; would replicate the official API badly.
+Google Charts in Play Console publish an aria-live announcement of shape
 
-### Detection probe (Step 3 of SKILL.md)
-
-```js
-(() => ({
-  loggedIn: !!document.querySelector('[role="navigation"]') &&
-             !location.hostname.includes('accounts.google.com'),
-  reason:   document.title || location.pathname,
-}))();
 ```
+<YYYY-MM-DD> 00:00:00.000: <series name> is <value>.
+```
+
+every time the cursor crosses a datapoint. The series name varies per chart ("All countries / regions", "Peers' median (…)", etc.). To sweep:
+
+1. Inject `play_scrape.js`. Call `window.aaarrrInstallChartObserver()` — sets a `MutationObserver` that catches every announcement.
+2. Scroll the canvas into view: `window.aaarrrScrollPlayContent(<scrollTop>)` (Play scrolls inside `.main-content`, not the window).
+3. Read coordinates: `window.aaarrrChartHoverGrid(<canvasIndex>, 30)` returns ~30 `[x, y]` viewport points across the chart's x-axis.
+4. Real-hover at each point. Use `mcp__Claude_in_Chrome__computer { action: "hover" }` in one `browser_batch` — synthetic JS pointer events DO NOT trigger the chart.
+5. After the batch, `window.aaarrrReadCaptures({ excludePeers: true })` returns the captured `{ date, value }` series.
+
+**Cost:** ~30 hovers × ~150 tokens each + 2 JS reads ≈ 5–6K tokens per chart. Compute window aggregates locally in Python.
+
+**Charts that work this way:** every canvas chart in Play Console — Store listing visitors/acquisitions/conversion, Retention, DAU, Revenue, Crash rate. Same observer regex works on all of them.
+
+### Two known traps when sweeping
+
+- **Conversion-rate charts have a "Peers' median" series.** The first regex was `is ([\d.]+)` — for a single-series chart, that's fine; for a two-series chart, the value picked up the trailing `.` from "is 0.21." and `Number` returned NaN. The observer in `play_scrape.js` is now `is (\d+(?:\.\d+)?)` to avoid this.
+- **Charts past the first canvas are off-screen.** `getBoundingClientRect` will show `y` outside the viewport. Scroll `.main-content` (not `window`) by ~600px to bring the second chart into view. The hover-grid helper warns if the canvas isn't visible.
+
+### Why not synthetic keyboard / pointer events
+
+The chart container has `tabindex=0` and the page advertises "Use left and right keys to navigate." Dispatching synthetic `KeyboardEvent('keydown', { key: 'ArrowRight' })` DOES update the chart, but firing 30 of them in a tight loop with the chart's `requestAnimationFrame` redraw between each one will exceed the Chrome MCP's 45s `Runtime.evaluate` timeout. Real keyboard via `computer.key` works but costs the same as hover. Stick with hover.
+
+### Where to actually go for production
+
+For high-fidelity, low-cost, contract-stable per-day data, the official APIs win:
+- **App Store Connect Analytics Reports API** — JWT-auth, daily report files. https://developer.apple.com/help/app-store-connect-analytics/overview/analytics-reports-api/
+- **Play Developer Reporting API** — OAuth, REST; covers Android Vitals (crashes/ANR/slow starts/wakelocks). https://developers.google.com/play/developer/reporting
+- **Google Play Billing reconciliation** — for revenue, use the Cloud Storage reconciliation reports rather than dashboard scraping.
+
+The chart-hover technique is great for "I want a daily report tonight without setting up OAuth." For production runs, set up the APIs once.
 
 ### Card label patterns
 
