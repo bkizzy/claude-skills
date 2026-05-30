@@ -73,16 +73,63 @@ Play Console is a Closure-compiled SPA — there's no clean JSON endpoint that
 covers everything. The scraper opens each report page in a hidden iframe and
 reads rendered numbers.
 
-### Page paths (relative)
+### Page paths (relative) — verified May 2026
 
-| What | Path under `/console/u/0/developers/<devId>/app/<pkg>/` |
-| --- | --- |
-| App overview | `/dashboard` |
-| Statistics (installs / actives) | `/statistics` |
-| Retention | `/statistics?ts_view=retention` |
-| Vitals (crashes, ANR) | `/vitals/overview` |
-| Acquisition channels | `/acquisition-reports/store-listing` |
-| Reviews | `/user-feedback/reviews` |
+| What | Path under `/console/u/0/developers/<devId>/app/<pkg>/` | Text-scrapable? |
+| --- | --- | --- |
+| App overview | `/app-dashboard` | Mostly nav chrome |
+| **Grow users headline** | `/grow-overview` | ✅ **Best text source.** Inlines: device acquisitions, first opens, MAU, 7-day retention, store-listing conversion rate, all as 28d totals with WoW % deltas. |
+| Statistics (any metric) | `/statistics?metrics=<METRIC_KEY>&dimension=COUNTRY&dimensionValues=OVERALL%2CUS%2CCA%2CIR%2CDE&dateRange=2026_5_1-2026_5_28` | Daily values inline for `ACTIVE_USERS` only; other metrics render data only in `<canvas>`. |
+| Vitals (crashes, ANR) | `/vitals/crashes?days=28&versionCode=<v>&isUserPerceived=true` | "1 - N" pagination string gives crash *issue count*; rates are SVG. |
+| Store listing analysis | `/reporting/acquisition/details` | 3 charts (Visitors, Acquisitions, Conversion) — all `<canvas>`, not text. |
+| Financial overview | `/reporting/finance/overview` | ARPPU + avg transaction value in text; revenue is SVG. |
+| Financial revenue | `/reporting/finance/revenue` | Canvas only. |
+| Financial buyers | `/reporting/finance/buyers` | Canvas only. |
+| Financial conversions | `/reporting/finance/buyers-conversions` | Cohort table — text on small datasets, "Data unavailable" if sparse. |
+| Subscriptions (products) | `/subscriptions` | Product list only — analytics elsewhere. |
+| Ratings overview | `/user-feedback/ratings` | ✅ Headline: default rating, 28d avg rating, ratings count, peer median. |
+| Reviews list | `/user-feedback/reviews` | ✅ Recent reviews including text body, author, date, device. |
+
+### Statistics page metric keys (deep links)
+
+The `?metrics=<KEY>` URL param swaps the metric. Verified keys:
+
+```
+DEVICE_ACQUISITION-ALL-EVENTS-PER_INTERVAL-DAY            ← installs
+ENGAGEMENT_DAILY_ACTIVE_USERS-ACQUISITION_UNSPECIFIED-UNIQUE-PER_INTERVAL-DAY  ← DAU
+ENGAGEMENT_RETENTION_BY_DEVICE-ACQUISITION_UNSPECIFIED-COUNT_UNSPECIFIED-PER_INTERVAL-DAY  ← retention cohort
+FIRST_OPENS_BY_DEVICE-ACQUISITION_UNSPECIFIED-COUNT_UNSPECIFIED-PER_INTERVAL-DAY  ← first opens
+ACTIVE_USERS-ALL-UNIQUE-PER_INTERVAL-DAY                  ← active users (only one with daily text)
+```
+
+### The Canvas wall
+
+**Most Statistics / Financial / Acquisition pages render their charts as `<canvas>`, not SVG.** That means:
+
+- No text/aria fallback on data points.
+- Path geometry can't be parsed back to values (raster, not vector).
+- Tooltip-on-hover is the only DOM way to surface values — one mouseover per day per metric, ~28× per metric, brittle and slow.
+
+The two text-friendly exceptions on the dashboard are:
+1. **`/grow-overview`** — 28d headlines in text.
+2. **`/statistics?metrics=ACTIVE_USERS-…`** with multi-country `dimensionValues` — renders a "Percentage of total" daily table in plain text. Other metrics on the same page do NOT, for reasons unclear.
+
+### Strategy for full coverage (out of scope v1)
+
+If you want per-day Play data without the canvas wall:
+- **Play Developer Reporting API** — official, OAuth, covers crashes, ANR, slow starts, wakelocks. Limited to vitals data. https://developers.google.com/play/developer/reporting
+- **Hover-and-capture** — script `mouseover` events at chart x-coordinates calculated from the date range. Brittle but works.
+- **Reverse the protobuf RPC** — the data lives in cross-origin POSTs to `playconsoleplatform-pa.clients6.google.com` with rotating `SAPISIDHASH` auth tokens. Complex; would replicate the official API badly.
+
+### Detection probe (Step 3 of SKILL.md)
+
+```js
+(() => ({
+  loggedIn: !!document.querySelector('[role="navigation"]') &&
+             !location.hostname.includes('accounts.google.com'),
+  reason:   document.title || location.pathname,
+}))();
+```
 
 ### Card label patterns
 
@@ -96,16 +143,6 @@ these regexes in `play_scrape.js`:
 /crash rate/i                  → crash_rate
 /anr rate/i                    → anr_rate
 /uninstalls?/i                 → uninstalls
-```
-
-### Detection probe (Step 3 of SKILL.md)
-
-```js
-(() => ({
-  loggedIn: !!document.querySelector('[role="navigation"]') &&
-             !location.hostname.includes('accounts.google.com'),
-  reason:   document.title || location.pathname,
-}))();
 ```
 
 ### Known v1 gaps on Play
