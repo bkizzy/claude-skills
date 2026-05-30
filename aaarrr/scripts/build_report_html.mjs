@@ -128,10 +128,20 @@ function cells(storeBlob, pluck, side, opts = {}) {
   pushMover(dodMovers, `${opts.label} (${side})`, yday, dayBefore);
   pushMover(wowMovers, `${opts.label} (${side})`, curr, prior);
 
+  // Fallback: when a store only has 28d aggregates (e.g. Play's grow-overview
+  // doesn't surface per-day data in text), promote the 28d value into the
+  // primary cell with a "(28d)" tag so it isn't lost in the rightmost column.
+  let primaryHtml;
+  if (curr == null && base28 != null) {
+    primaryHtml = `<td class="num primary fallback">${f(base28)}<span class="agg-tag">28d</span></td>`;
+  } else {
+    primaryHtml = `<td class="num primary">${f(curr)}</td>`;
+  }
+
   const baselineDisplay = base28 == null ? "—" : opts.pct ? f(Number(base28)) : f(Number(base28) / 28);
 
   return [
-    `<td class="num primary">${f(curr)}</td>`,
+    primaryHtml,
     `<td class="num">${deltaChip(yday, dayBefore)}</td>`,
     `<td class="num">${deltaChip(curr, prior)}</td>`,
     `<td class="num muted">${baselineDisplay}</td>`,
@@ -443,6 +453,8 @@ const html = `<!DOCTYPE html>
   th.lbl { font-weight: 500; color: var(--fg); }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.primary { color: var(--fg); font-weight: 600; }
+  td.primary.fallback { font-weight: 600; color: #1a1a1a; }
+  td.primary.fallback .agg-tag { font-size: 10px; font-weight: 500; background: #ebebe5; color: var(--muted); padding: 1px 5px; border-radius: 3px; margin-left: 5px; vertical-align: middle; letter-spacing: 0.02em; }
   td.muted, .muted { color: var(--muted); }
   .small { font-size: 12px; }
   .ios { color: var(--ios); }
