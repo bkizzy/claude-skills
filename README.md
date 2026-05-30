@@ -14,7 +14,7 @@ Skills are discovered from `~/.claude/skills/`. To install one of these in your 
 
 ```bash
 # Clone the repo somewhere (anywhere — pick your skills workspace)
-git clone https://github.com/bkizzy/claude-skills.git ~/code/claude-skills
+git clone <repo-url> ~/code/claude-skills
 
 # Symlink each skill you want into ~/.claude/skills/
 ln -s ~/code/claude-skills/aaarrr ~/.claude/skills/aaarrr
