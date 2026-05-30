@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AAARRR — Ferndale Field Guide</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a1a;
+    --muted: #6b6b6b;
+    --line: #e2e2dc;
+    --accent: #2d5cf5;
+    --ios: #007aff;
+    --android: #34a853;
+    --up: #0a7d2e;
+    --up-bg: #e6f4ea;
+    --down: #b41818;
+    --down-bg: #fce8e6;
+    --flat: #6b6b6b;
+    --flat-bg: #efefee;
+    --callout-bg: #fef9e7;
+    --warn-bg: #fde7d6;
+    --warn-fg: #8a3e00;
+    --info-bg: #e7f0fd;
+    --info-fg: #0b3d91;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1240px; margin: 0 auto; padding: 32px 28px 80px; }
+  header.head { margin-bottom: 24px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; margin: 36px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 14px; margin: 14px 0 8px; color: var(--fg); font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .public-strip { font-size: 13px; color: var(--muted); margin: 0 0 16px; padding: 8px 12px; background: white; border: 1px solid var(--line); border-radius: 6px; }
+  .public-strip strong { color: var(--fg); }
+  .windows-banner { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; color: var(--fg); }
+  .windows-banner strong { font-variant-numeric: tabular-nums; }
+  .windows-banner .ios { color: var(--ios); font-weight: 600; display: inline-block; min-width: 60px; }
+  .windows-banner .android { color: var(--android); font-weight: 600; display: inline-block; min-width: 60px; }
+  .windows-banner .lag-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+  .banner { padding: 10px 14px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .banner.info { background: var(--info-bg); color: var(--info-fg); }
+
+  /* Callout */
+  .callout { background: var(--callout-bg); border: 1px solid #f0e2a0; border-radius: 8px; padding: 14px 18px; margin: 18px 0 26px; }
+  .callout h3 { margin-top: 0; margin-bottom: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: #8a6500; }
+  .callout.small { padding: 8px 12px; font-size: 13px; margin: 12px 0; }
+  .movers { list-style: none; padding: 0; margin: 0; }
+  .movers li { padding: 4px 0; font-size: 14px; }
+
+  /* TOC */
+  .toc { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; margin-bottom: 26px; font-size: 13px; }
+  .toc ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin: 0 0 8px; }
+  .table-wrap.narrow { max-width: 480px; }
+  table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; font-size: 13px; }
+  th, td { padding: 7px 10px; text-align: left; vertical-align: middle; }
+  thead th { background: #f3f3ee; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); text-align: right; }
+  thead th.lbl, thead th.store-head { text-align: left; }
+  thead th.store-head { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg); background: #ebebe5; }
+  thead th.store-head.ios { color: var(--ios); }
+  thead th.store-head.android { color: var(--android); }
+  thead th.store-head .dates { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; text-transform: none; margin-left: 6px; }
+  tbody tr:nth-child(odd) { background: #fbfbf8; }
+  tbody tr:hover { background: #f3f3ee; }
+  th.lbl { font-weight: 500; color: var(--fg); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.primary { color: var(--fg); font-weight: 600; }
+  td.primary.fallback { font-weight: 600; color: #1a1a1a; }
+  td.primary.fallback .agg-tag { font-size: 10px; font-weight: 500; background: #ebebe5; color: var(--muted); padding: 1px 5px; border-radius: 3px; margin-left: 5px; vertical-align: middle; letter-spacing: 0.02em; }
+  td.muted, .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .ios { color: var(--ios); }
+  .android { color: var(--android); }
+  th.ios, th.android { text-align: right; }
+
+  /* Chips */
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; line-height: 1.6; }
+  .chip.up { background: var(--up-bg); color: var(--up); }
+  .chip.down { background: var(--down-bg); color: var(--down); }
+  .chip.flat { background: var(--flat-bg); color: var(--flat); }
+  .chip.dim { background: transparent; color: var(--muted); }
+  .chip.low-vol { opacity: 0.4; }
+
+  /* Sources / referral / reviews */
+  .src-grid, .ref-grid, .rev-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; margin: 12px 0 4px; }
+  .src-list, .ref-list, .reviews { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; margin: 0; list-style: none; }
+  .ref-list { padding-left: 14px; list-style: decimal inside; }
+  .src-list li, .ref-list li { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .src-head { font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); margin-bottom: 4px; padding-bottom: 4px !important; }
+  .reviews li { padding: 8px 0; border-top: 1px solid var(--line); }
+  .reviews li:first-child { border-top: 0; padding-top: 0; }
+  .rev-star { font-weight: 700; color: #b78600; }
+  .rev-title { font-weight: 600; margin: 2px 0; }
+  .rev-body { font-size: 13px; color: var(--muted); }
+
+  /* Issues */
+  .issues { margin-top: 36px; background: white; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+  .issues summary { cursor: pointer; font-weight: 600; color: var(--muted); font-size: 13px; }
+  .issues ul { margin: 8px 0 4px; padding-left: 18px; }
+
+  /* Footnotes */
+  .footnotes { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .footnotes ol { padding-left: 20px; }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .container { max-width: none; padding: 0; }
+    .toc, .issues { display: none; }
+    table { font-size: 11px; }
+    h2 { break-after: avoid-page; }
+    .table-wrap { break-inside: avoid; }
+    section { break-inside: avoid; }
+    .chip.up { background: white; color: black; border: 1px solid var(--up); }
+    .chip.down { background: white; color: black; border: 1px solid var(--down); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+<header class="head">
+  <h1>AAARRR — Ferndale Field Guide</h1>
+  <p class="meta">Generated 2026-05-30 02:24 · Window: rolling_7d · iOS ✓ · Android ✓</p>
+  
+  <div class="windows-banner"><div><span class="ios">iOS</span> · 7d <strong>Jun 8–Jun 14</strong> · prior <strong>Jun 1–Jun 7</strong> · 28d <strong>May 18–Jun 14</strong> · DoD Jun 14 vs Jun 13</div><div><span class="android">Android</span> · 7d <strong>Jun 4–Jun 10</strong> · prior <strong>May 28–Jun 3</strong> · 28d <strong>May 14–Jun 10</strong> · DoD Jun 10 vs Jun 9</div><div class="lag-note small muted">Note: Android trails iOS by a few days — Play finalizes daily data with a lag.</div></div>
+  <div class="public-strip"><span><strong>4.70★</strong> public (156 reviews)</span> · <span>#34 in Reference</span></div>
+  <div class="callout"><h3>What changed since yesterday</h3><ul class="movers"><li><span class="chip up">▲ +400%</span> <strong>Proceeds (USD) (iOS)</strong> <span class="muted">3 → 15</span></li><li><span class="chip up">▲ +200%</span> <strong>First-time installs (iOS)</strong> <span class="muted">3 → 9</span></li><li><span class="chip up">▲ +138%</span> <strong>First-time installs (Android)</strong> <span class="muted">16 → 38</span></li></ul></div>
+  <nav class="toc"><ul><li><a href="#awareness">Awareness</a></li><li><a href="#acquisition">Acquisition</a></li><li><a href="#activation">Activation</a></li><li><a href="#retention">Retention</a></li><li><a href="#revenue">Revenue</a></li><li><a href="#referral">Referral</a></li><li><a href="#ratings">Ratings & Reviews</a></li></ul></nav>
+</header>
+<section id="awareness"><h2>Awareness</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="lbl"></th>
+        <th colspan="4" class="store-head ios">iOS <span class="dates">· Jun 8–Jun 14</span></th>
+        <th colspan="4" class="store-head android">Android <span class="dates">· Jun 4–Jun 10</span></th>
+      </tr>
+      <tr>
+        <th class="lbl">Metric</th>
+        <th title="Jun 8–Jun 14">7d</th><th title="Jun 14 vs Jun 13">DoD</th><th title="Jun 8–Jun 14 vs Jun 1–Jun 7">WoW</th><th title="May 18–Jun 14">28d avg</th>
+        <th title="Jun 4–Jun 10">7d</th><th title="Jun 10 vs Jun 9">DoD</th><th title="Jun 4–Jun 10 vs May 28–Jun 3">WoW</th><th title="May 14–Jun 10">28d avg</th>
+      </tr>
+    </thead>
+    <tbody><tr><th class="lbl">Impressions<sup><a href="#fn-1" id="fnref-1">1</a></sup></th><td class="num primary">2,659</td><td class="num"><span class="chip down">▼ -2%</span></td><td class="num"><span class="chip flat">· -1%</span></td><td class="num muted">383</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">Page views</th><td class="num primary">648</td><td class="num"><span class="chip down">▼ -11%</span></td><td class="num"><span class="chip down">▼ -12%</span></td><td class="num muted">90.86</td><td class="num primary">1,080</td><td class="num"><span class="chip up">▲ +45%</span></td><td class="num"><span class="chip up">▲ +39%</span></td><td class="num muted">149.29</td></tr></tbody>
+  </table>
+</div></section>
+<section id="acquisition"><h2>Acquisition</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="lbl"></th>
+        <th colspan="4" class="store-head ios">iOS <span class="dates">· Jun 8–Jun 14</span></th>
+        <th colspan="4" class="store-head android">Android <span class="dates">· Jun 4–Jun 10</span></th>
+      </tr>
+      <tr>
+        <th class="lbl">Metric</th>
+        <th title="Jun 8–Jun 14">7d</th><th title="Jun 14 vs Jun 13">DoD</th><th title="Jun 8–Jun 14 vs Jun 1–Jun 7">WoW</th><th title="May 18–Jun 14">28d avg</th>
+        <th title="Jun 4–Jun 10">7d</th><th title="Jun 10 vs Jun 9">DoD</th><th title="Jun 4–Jun 10 vs May 28–Jun 3">WoW</th><th title="May 14–Jun 10">28d avg</th>
+      </tr>
+    </thead>
+    <tbody><tr><th class="lbl">First-time installs</th><td class="num primary">94</td><td class="num"><span class="chip up">▲ +200%</span></td><td class="num"><span class="chip down">▼ -36%</span></td><td class="num muted">18.46</td><td class="num primary">159</td><td class="num"><span class="chip up">▲ +138%</span></td><td class="num"><span class="chip down">▼ -8%</span></td><td class="num muted">21.79</td></tr><tr><th class="lbl">Re-downloads<sup><a href="#fn-2" id="fnref-2">2</a></sup></th><td class="num primary">46</td><td class="num"><span class="chip down">▼ -50%</span></td><td class="num"><span class="chip down">▼ -2%</span></td><td class="num muted">6.93</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">Conversion rate</th><td class="num primary">3.5%</td><td class="num"><span class="chip up low-vol">▲ +208%</span></td><td class="num"><span class="chip down low-vol">▼ -35%</span></td><td class="num muted">4.8%</td><td class="num primary">15.4%</td><td class="num"><span class="chip up low-vol">▲ +64%</span></td><td class="num"><span class="chip down low-vol">▼ -35%</span></td><td class="num muted">16.6%</td></tr></tbody>
+  </table>
+</div>
+<div class="src-grid">
+  <ul class="src-list"><li class="src-head">iOS top sources (7d)</li><li><span>App Store Search</span><span class="num muted"></span></li><li><span>App Store Browse</span><span class="num muted"></span></li><li><span>Web Referrer</span><span class="num muted"></span></li><li><span>App Referrer</span><span class="num muted"></span></li></ul>
+  <ul class="src-list"><li class="src-head">Android top sources (7d)</li><li><span>Play Store (organic search)</span><span class="num muted"></span></li><li><span>Play Store (browse)</span><span class="num muted"></span></li><li><span>Third-party referrer</span><span class="num muted"></span></li></ul>
+</div></section>
+<section id="activation"><h2>Activation</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="lbl"></th>
+        <th colspan="4" class="store-head ios">iOS <span class="dates">· Jun 8–Jun 14</span></th>
+        <th colspan="4" class="store-head android">Android <span class="dates">· Jun 4–Jun 10</span></th>
+      </tr>
+      <tr>
+        <th class="lbl">Metric</th>
+        <th title="Jun 8–Jun 14">7d</th><th title="Jun 14 vs Jun 13">DoD</th><th title="Jun 8–Jun 14 vs Jun 1–Jun 7">WoW</th><th title="May 18–Jun 14">28d avg</th>
+        <th title="Jun 4–Jun 10">7d</th><th title="Jun 10 vs Jun 9">DoD</th><th title="Jun 4–Jun 10 vs May 28–Jun 3">WoW</th><th title="May 14–Jun 10">28d avg</th>
+      </tr>
+    </thead>
+    <tbody><tr><th class="lbl">Active devices</th><td class="num primary">164</td><td class="num"><span class="chip down">▼ -14%</span></td><td class="num"><span class="chip down">▼ -9%</span></td><td class="num muted">23.07</td><td class="num primary fallback">1,840<span class="agg-tag">28d</span></td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">65.71</td></tr><tr><th class="lbl">Sessions</th><td class="num primary">640</td><td class="num"><span class="chip up">▲ +44%</span></td><td class="num"><span class="chip up">▲ +5%</span></td><td class="num muted">82.54</td><td class="num primary fallback">920<span class="agg-tag">28d</span></td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">32.86</td></tr><tr><th class="lbl">Sessions / device<sup><a href="#fn-3" id="fnref-3">3</a></sup></th><td class="num primary">3.9</td><td class="num"><span class="chip up">▲ +66%</span></td><td class="num"><span class="chip up">▲ +16%</span></td><td class="num muted">0.13</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">Crashes</th><td class="num primary">0</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip down low-vol">▼ -100%</span></td><td class="num muted">0.14</td><td class="num primary fallback">2<span class="agg-tag">28d</span></td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">0.07</td></tr></tbody>
+  </table>
+</div></section>
+<section id="retention"><h2>Retention</h2>
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr><th class="lbl">Cohort</th><th class="ios">iOS</th><th class="android">Android</th></tr>
+    </thead>
+    <tbody><tr><th class="lbl">D1</th><td class="num primary">—</td><td class="num primary">—</td></tr><tr><th class="lbl">D7</th><td class="num primary">—</td><td class="num primary">27.0%</td></tr><tr><th class="lbl">D14 / D15</th><td class="num primary">—</td><td class="num primary">—</td></tr><tr><th class="lbl">D28 / D30</th><td class="num primary">—</td><td class="num primary">—</td></tr></tbody>
+  </table>
+</div>
+<p class="muted small">Cohort = % of installers still active N days later, measured as-of yesterday.</p></section>
+<section id="revenue"><h2>Revenue</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="lbl"></th>
+        <th colspan="4" class="store-head ios">iOS <span class="dates">· Jun 8–Jun 14</span></th>
+        <th colspan="4" class="store-head android">Android <span class="dates">· Jun 4–Jun 10</span></th>
+      </tr>
+      <tr>
+        <th class="lbl">Metric</th>
+        <th title="Jun 8–Jun 14">7d</th><th title="Jun 14 vs Jun 13">DoD</th><th title="Jun 8–Jun 14 vs Jun 1–Jun 7">WoW</th><th title="May 18–Jun 14">28d avg</th>
+        <th title="Jun 4–Jun 10">7d</th><th title="Jun 10 vs Jun 9">DoD</th><th title="Jun 4–Jun 10 vs May 28–Jun 3">WoW</th><th title="May 14–Jun 10">28d avg</th>
+      </tr>
+    </thead>
+    <tbody><tr><th class="lbl">Proceeds (USD)</th><td class="num primary">$92</td><td class="num"><span class="chip up">▲ +400%</span></td><td class="num"><span class="chip up">▲ +7%</span></td><td class="num muted">$12</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">IAP transactions</th><td class="num primary">13</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip down">▼ -19%</span></td><td class="num muted">2.14</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">Active subscriptions<sup><a href="#fn-4" id="fnref-4">4</a></sup></th><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td><td class="num primary">—</td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">—</td></tr><tr><th class="lbl">ARPU</th><td class="num primary">$5</td><td class="num"><span class="chip up">▲ +25%</span></td><td class="num"><span class="chip down">▼ -37%</span></td><td class="num muted">$0</td><td class="num primary fallback">$3<span class="agg-tag">28d</span></td><td class="num"><span class="chip dim">—</span></td><td class="num"><span class="chip dim">—</span></td><td class="num muted">$0</td></tr></tbody>
+  </table>
+</div><p class="callout small"><strong>Yesterday revenue</strong> — iOS: $15 · Android: —</p></section>
+<section id="referral"><h2>Referral</h2>
+<p class="muted small">Top acquisition sources per store. Not UTM-level — true campaign attribution needs an SDK.</p>
+<div class="ref-grid">
+  <div class="ref-side"><h3>iOS</h3><ol class="ref-list"><li><span>App Store Search</span><span class="num muted"></span></li><li><span>App Store Browse</span><span class="num muted"></span></li><li><span>Web Referrer</span><span class="num muted"></span></li><li><span>App Referrer</span><span class="num muted"></span></li></ol></div>
+  <div class="ref-side"><h3>Android</h3><ol class="ref-list"><li><span>Play Store (organic search)</span><span class="num muted"></span></li><li><span>Play Store (browse)</span><span class="num muted"></span></li><li><span>Third-party referrer</span><span class="num muted"></span></li></ol></div>
+</div></section>
+<section id="ratings"><h2>Ratings &amp; Reviews</h2>
+<div class="table-wrap narrow">
+  <table>
+    <thead><tr><th class="lbl"></th><th class="ios">iOS</th><th class="android">Android</th></tr></thead>
+    <tbody>
+      <tr><th class="lbl">Average</th><td class="num primary">4.70 ★</td><td class="num primary">4.40 ★</td></tr>
+      <tr><th class="lbl">Total count</th><td class="num">142</td><td class="num">218</td></tr>
+      <tr><th class="lbl">New yesterday</th><td class="num">2</td><td class="num">—</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="rev-grid">
+  <div class="rev-side"><h3>Latest iOS reviews</h3><ul class="reviews">
+      <li>
+        <div class="rev-meta"><span class="rev-star">5★</span> <span class="muted small">2026-06-14</span> </div>
+        <div class="rev-title">Best birding companion</div>
+        <div class="rev-body">Take it on every hike. The bird-call ID feature is uncanny — caught a Wilson&#39;s warbler I would have missed.</div>
+      </li>
+      <li>
+        <div class="rev-meta"><span class="rev-star">5★</span> <span class="muted small">2026-06-13</span> </div>
+        <div class="rev-title">Perfect for casual naturalists</div>
+        <div class="rev-body">Clean UI, no ads, no upsell pop-ups. Worth the one-time purchase.</div>
+      </li>
+      <li>
+        <div class="rev-meta"><span class="rev-star">4★</span> <span class="muted small">2026-06-12</span> </div>
+        <div class="rev-title">Mostly great</div>
+        <div class="rev-body">Wish the offline maps covered more state parks. Hoping for an update.</div>
+      </li></ul></div>
+  <div class="rev-side"><h3>Latest Android reviews</h3><ul class="reviews">
+      <li>
+        <div class="rev-meta"><span class="rev-star">5★</span> <span class="muted small">2026-06-09</span> <span class="muted small">— M. Henderson</span></div>
+        
+        <div class="rev-body">Excellent for a family hike — the kids love the photo-based plant ID.</div>
+      </li>
+      <li>
+        <div class="rev-meta"><span class="rev-star">3★</span> <span class="muted small">2026-06-08</span> <span class="muted small">— Sarah K.</span></div>
+        
+        <div class="rev-body">Maps are great but I wish I could export sightings to a CSV.</div>
+      </li></ul></div>
+</div></section>
+<details class="issues"><summary>Collection issues (6)</summary><ul><li class="small">iOS: apple.active_subs: not implemented (subscription endpoint path TBD)</li><li class="small">iOS: apple.retention: not implemented (cohort endpoint path TBD)</li><li class="small">Android: play.impressions: not exposed by Play Console (Acquisition reports → Store performance is closest)</li><li class="small">Android: play.active_subs: not yet mapped in v1</li><li class="small">Android: play.proceeds: chart values are SVG-rendered on /reporting/finance/revenue — sweep with chart-hover technique if needed</li><li class="small">Android: play.retention.d1.d14.d28: only d7 surfaced as headline; deeper cohorts require chart sweep</li></ul></details>
+<aside class="footnotes"><h3>Notes</h3><ol><li id="fn-1">Android — not directly exposed by Play Console (Acquisition reports → Store performance is closest) <a href="#fnref-1">↩</a></li><li id="fn-2">Android — Play exposes &#39;Re-installs&#39; on Statistics with a dimension toggle <a href="#fnref-2">↩</a></li><li id="fn-3">Android — see Sessions <a href="#fnref-3">↩</a></li><li id="fn-4">iOS — ASC subscriptions endpoint not mapped in v1 — see selectors.md <a href="#fnref-4">↩</a></li></ol></aside>
+</div>
+</body>
+</html>

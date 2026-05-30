@@ -1,0 +1,230 @@
+{
+  "store": "apple_connect",
+  "app": "Ferndale Field Guide",
+  "windows": {
+    "yesterday": {
+      "date": "2026-06-14"
+    },
+    "rolling_7d": {
+      "start": "2026-06-08",
+      "end": "2026-06-14"
+    },
+    "prior_7d": {
+      "start": "2026-06-01",
+      "end": "2026-06-07"
+    },
+    "baseline_28d": {
+      "start": "2026-05-18",
+      "end": "2026-06-14"
+    }
+  },
+  "app_meta": {
+    "app_store_id": "6612345678",
+    "bundle_id": "com.example.fieldguide",
+    "name": "Ferndale Field Guide"
+  },
+  "awareness": {
+    "impressions": {
+      "7d": 2659,
+      "prior_7d": 2682,
+      "28d": 10724,
+      "yesterday": 400,
+      "day_before": 410
+    },
+    "page_views": {
+      "7d": 648,
+      "prior_7d": 736,
+      "28d": 2544,
+      "yesterday": 62,
+      "day_before": 70
+    }
+  },
+  "acquisition": {
+    "first_downloads": {
+      "7d": 94,
+      "prior_7d": 147,
+      "28d": 517,
+      "yesterday": 9,
+      "day_before": 3
+    },
+    "redownloads": {
+      "7d": 46,
+      "prior_7d": 47,
+      "28d": 194,
+      "yesterday": 4,
+      "day_before": 8
+    },
+    "conversion_rate": {
+      "7d": 0.0354,
+      "prior_7d": 0.0548,
+      "28d": 0.0482,
+      "yesterday": 0.0225,
+      "day_before": 0.0073
+    },
+    "top_sources": [
+      {
+        "name": "App Store Search",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "App Store Browse",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Web Referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "App Referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      }
+    ]
+  },
+  "activation": {
+    "active_devices": {
+      "7d": 164,
+      "prior_7d": 181,
+      "28d": 646,
+      "yesterday": 19,
+      "day_before": 22
+    },
+    "sessions": {
+      "7d": 640,
+      "prior_7d": 611,
+      "28d": 2311,
+      "yesterday": 112,
+      "day_before": 78
+    },
+    "sessions_per_device": {
+      "7d": 3.9024,
+      "prior_7d": 3.3757,
+      "28d": 3.5774,
+      "yesterday": 5.8947,
+      "day_before": 3.5455
+    },
+    "crashes": {
+      "7d": 0,
+      "prior_7d": 1,
+      "28d": 4,
+      "yesterday": 0,
+      "day_before": 0
+    }
+  },
+  "retention": {
+    "d1": null,
+    "d7": null,
+    "d14": null,
+    "d28": null
+  },
+  "revenue": {
+    "proceeds_usd": {
+      "7d": 92,
+      "prior_7d": 86,
+      "28d": 340,
+      "yesterday": 15,
+      "day_before": 3
+    },
+    "iap_count": {
+      "7d": 13,
+      "prior_7d": 16,
+      "28d": 60,
+      "yesterday": 2,
+      "day_before": 0
+    },
+    "active_subs": {
+      "7d": null,
+      "prior_7d": null,
+      "28d": null,
+      "yesterday": null,
+      "day_before": null
+    },
+    "arpu": {
+      "7d": 5.4118,
+      "prior_7d": 8.6,
+      "28d": 5.8621,
+      "yesterday": 3.75,
+      "day_before": 3.0
+    },
+    "paying_users": {
+      "7d": 17,
+      "prior_7d": 10,
+      "28d": 58,
+      "yesterday": 4,
+      "day_before": 1
+    }
+  },
+  "referral": {
+    "by_source": [
+      {
+        "name": "App Store Search",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "App Store Browse",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "Web Referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      },
+      {
+        "name": "App Referrer",
+        "share_7d": null,
+        "share_prior_7d": null
+      }
+    ]
+  },
+  "ratings": {
+    "avg": 4.7,
+    "count": 142,
+    "new_yesterday": 2,
+    "recent_reviews": [
+      {
+        "rating": 5,
+        "title": "Best birding companion",
+        "body": "Take it on every hike. The bird-call ID feature is uncanny \u2014 caught a Wilson's warbler I would have missed.",
+        "date": "2026-06-14"
+      },
+      {
+        "rating": 5,
+        "title": "Perfect for casual naturalists",
+        "body": "Clean UI, no ads, no upsell pop-ups. Worth the one-time purchase.",
+        "date": "2026-06-13"
+      },
+      {
+        "rating": 4,
+        "title": "Mostly great",
+        "body": "Wish the offline maps covered more state parks. Hoping for an update.",
+        "date": "2026-06-12"
+      }
+    ]
+  },
+  "asc_public": {
+    "fetched_at": "2026-06-15T08:00:00Z",
+    "rating": {
+      "avg": 4.7,
+      "count": 156
+    },
+    "rank": {
+      "category": "Reference",
+      "position": 34
+    },
+    "editorial": {
+      "today_featured": false,
+      "story_count": 0
+    },
+    "recent_reviews": [],
+    "errors": []
+  },
+  "errors": [
+    "apple.active_subs: not implemented (subscription endpoint path TBD)",
+    "apple.retention: not implemented (cohort endpoint path TBD)"
+  ]
+}

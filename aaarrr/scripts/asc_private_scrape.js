@@ -12,7 +12,7 @@
 // On any per-metric failure, the value is `null` and a string is pushed to
 // the top-level `errors[]` — the renderer turns nulls into "—" footnotes.
 //
-// App resolution order (so a user with multiple matching-like apps can
+// App resolution order (so a user with multiple matching apps can
 // disambiguate without changing the cfg):
 //   1. `cfg.forceAppId` if provided — used as-is.
 //   2. `location.href` — if the user pre-navigated to /apps/<id>/... in
