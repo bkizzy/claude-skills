@@ -7,6 +7,7 @@ Custom [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) 
 | Skill | What it does |
 | --- | --- |
 | [`aaarrr/`](./aaarrr/) | Builds an AAARRR pirate-metrics report from App Store Connect + Google Play Console via Claude-in-Chrome. |
+| [`html-doc/`](./html-doc/) | Makes HTML the default document format — a single self-contained file with a click-to-copy button. Falls back to .md/.docx/.pdf/.xlsx/.pptx only when requested. |
 
 ## Install
 
