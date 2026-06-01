@@ -29,10 +29,50 @@ for (let i = 2; i < process.argv.length; i++) {
 const slug = args.slug;
 const windowMode = args.window || "rolling_7d";
 const outPath = args.out;
+// Default: pirate flag on. Pass --no-pirate to suppress the swashbuckler.
+const showPirate = !("no-pirate" in args);
 if (!slug || !outPath) {
-  console.error("usage: build_report_html.mjs --slug <slug> --out <path.html> [--window rolling_7d] [--date YYYYMMDD]");
+  console.error("usage: build_report_html.mjs --slug <slug> --out <path.html> [--window rolling_7d] [--date YYYYMMDD] [--no-pirate]");
   process.exit(2);
 }
+
+// Inline SVG pirate emblem — tricorn hat + skull + crossed sabers.
+// Self-contained so the report stays a single file. ~1KB, renders crisply
+// at any size, matches the dark-ink aesthetic of the rest of the report.
+const PIRATE_SVG = `<svg class="pirate" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" aria-label="A swashbuckling pirate" role="img">
+  <defs><filter id="ink" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="0.3"/></filter></defs>
+  <g filter="url(#ink)">
+    <!-- Crossed sabers behind the skull -->
+    <line x1="15" y1="105" x2="115" y2="125" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="15" y1="125" x2="115" y2="105" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Saber hilts (cross-guards) -->
+    <line x1="9" y1="102" x2="22" y2="106" stroke="#1a1a1a" stroke-width="4" stroke-linecap="round"/>
+    <line x1="9" y1="128" x2="22" y2="124" stroke="#1a1a1a" stroke-width="4" stroke-linecap="round"/>
+    <line x1="120" y1="102" x2="118" y2="128" stroke="#1a1a1a" stroke-width="0"/>
+    <!-- Tricorn hat -->
+    <path d="M 18 52 Q 70 8 122 52 L 116 64 Q 90 54 70 53 Q 50 54 24 64 Z" fill="#1a1a1a"/>
+    <!-- Hat band -->
+    <ellipse cx="70" cy="60" rx="48" ry="4.5" fill="#1a1a1a"/>
+    <!-- Hat cockade accent -->
+    <circle cx="95" cy="42" r="4" fill="#b41818"/>
+    <circle cx="95" cy="42" r="1.5" fill="#1a1a1a"/>
+    <!-- Skull -->
+    <path d="M 36 84 Q 33 64 52 58 Q 62 55 70 55 Q 78 55 88 58 Q 107 64 104 84 L 100 96 Q 96 100 84 100 L 82 108 L 76 108 L 76 100 L 64 100 L 64 108 L 58 108 L 56 100 Q 44 100 40 96 Z" fill="#f4ead5" stroke="#1a1a1a" stroke-width="2"/>
+    <!-- Eye sockets -->
+    <ellipse cx="55" cy="76" rx="6" ry="7" fill="#1a1a1a"/>
+    <ellipse cx="85" cy="76" rx="6" ry="7" fill="#1a1a1a"/>
+    <!-- Tiny highlight in the eye sockets so they read as "alive, not dead" -->
+    <circle cx="56" cy="74" r="1" fill="#f4ead5"/>
+    <circle cx="86" cy="74" r="1" fill="#f4ead5"/>
+    <!-- Nose triangle -->
+    <path d="M 66 87 L 70 95 L 74 87 Z" fill="#1a1a1a"/>
+    <!-- Teeth grin -->
+    <rect x="56" y="100" width="28" height="6" fill="#f4ead5" stroke="#1a1a1a" stroke-width="1.2"/>
+    <line x1="63" y1="100" x2="63" y2="106" stroke="#1a1a1a" stroke-width="1.2"/>
+    <line x1="70" y1="100" x2="70" y2="106" stroke="#1a1a1a" stroke-width="1.2"/>
+    <line x1="77" y1="100" x2="77" y2="106" stroke="#1a1a1a" stroke-width="1.2"/>
+  </g>
+</svg>`;
 
 // Local date stamp (not UTC). UTC bites you when you run after 8pm EDT —
 // "today" flips to tomorrow and the cached JSON named with today's date is
@@ -420,7 +460,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AAARRR — ${escapeHtml(appName)}</title>
+<title>${escapeHtml(appName)} — App-store metrics for pirates</title>
 <style>
   :root {
     --bg: #fafaf8;
@@ -453,6 +493,11 @@ const html = `<!DOCTYPE html>
   }
   .container { max-width: 1240px; margin: 0 auto; padding: 32px 28px 80px; }
   header.head { margin-bottom: 24px; }
+  .title-row { display: flex; align-items: center; gap: 24px; margin-bottom: 6px; }
+  .title-text { flex: 1; }
+  .pirate { width: 120px; height: 120px; flex-shrink: 0; }
+  @media print { .pirate { width: 90px; height: 90px; } }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 4px; font-weight: 600; }
   h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
   h2 { font-size: 19px; margin: 36px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
   h3 { font-size: 14px; margin: 14px 0 8px; color: var(--fg); font-weight: 600; }
@@ -551,8 +596,14 @@ const html = `<!DOCTYPE html>
 <body>
 <div class="container">
 <header class="head">
-  <h1>AAARRR — ${escapeHtml(appName)}</h1>
-  <p class="meta">Generated ${generated} · Window: ${escapeHtml(windowMode)} · iOS ${ios ? "✓" : "—"} · Android ${android ? "✓" : "—"}</p>
+  <div class="title-row">
+    ${showPirate ? PIRATE_SVG : ""}
+    <div class="title-text">
+      <p class="eyebrow">App-store metrics for pirates</p>
+      <h1>${escapeHtml(appName)}</h1>
+      <p class="meta">Generated ${generated} · Window: ${escapeHtml(windowMode)} · iOS ${ios ? "✓" : "—"} · Android ${android ? "✓" : "—"}</p>
+    </div>
+  </div>
   ${storeBanners()}
   ${windowsBanner()}
   ${publicAppleStrip()}

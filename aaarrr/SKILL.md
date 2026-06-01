@@ -1,26 +1,28 @@
 ---
 name: aaarrr
 description: >
-  Builds an AAARRR (Awareness, Acquisition, Activation, Retention, Revenue, Referral)
-  pirate-metrics report for an app by scraping App Store Connect, the public Apple
-  App Store page, and Google Play Console via Claude-in-Chrome. Reports lead with
-  rolling 7-day numbers plus DoD/WoW deltas and a 28-day baseline — tuned for daily
-  reading. Invoked as /aaarrr. Use whenever the user types /aaarrr, asks for
-  "pirate metrics", "AAARRR report", "app store metrics", "store analytics", or
-  wants to compare iOS vs Android performance for their app.
-version: 0.1.0
+  App-store metrics, for pirates 🏴‍☠️ — builds an AAARRR (Awareness, Acquisition,
+  Activation, Retention, Revenue, Referral) report for an app. Claude drives the
+  Claude-in-Chrome extension to read App Store Connect, the public Apple App
+  Store page, and Google Play Console — all dashboards the user is already
+  signed into; no API keys or OAuth setup. Reports lead with rolling-7d numbers
+  plus DoD/WoW deltas and a 28-day baseline, tuned for daily reading. Invoked
+  as /aaarrr. Use whenever the user types /aaarrr, asks for "pirate metrics",
+  "AAARRR report", "app store metrics", "store analytics", or wants to compare
+  iOS vs Android performance for their app.
+version: 0.2.0
 ---
 
-# `/aaarrr` — App-store pirate-metrics report
+# `/aaarrr` — App-store metrics, for pirates 🏴‍☠️
 
 ## What this skill does
 
-Given an app name, scrape:
+Given an app name, Claude drives the Claude-in-Chrome extension to read:
 1. **App Store Connect** (private dashboard, login required) → `apple_connect` JSON
 2. **apps.apple.com** public page (no login) → merged into `apple_connect` JSON under `asc_public`
 3. **Google Play Console** (private dashboard, login required) → `google_play` JSON
 
-Then render a Markdown report that leads with **rolling-7d** numbers, **DoD** and **WoW** deltas, and a **28-day baseline**, plus a yesterday snapshot for revenue and ratings. One section per AAARRR pillar. Cross-store iOS / Android / Combined columns when both ran.
+Then renders a self-contained HTML report that leads with **rolling-7d** numbers, **DoD** and **WoW** deltas, and a **28-day baseline**, plus a yesterday snapshot for revenue and ratings. One section per AAARRR pillar. Cross-store iOS / Android columns when both ran. A swashbuckling pirate sits at the top by default; `--no-pirate` skips it.
 
 All AAARRR pillars are covered by store data alone — both stores expose retention cohorts natively (App Store Connect → Engagement → Retention; Play Console → Statistics → Users → Retained Users). No Firebase needed for v1.
 
@@ -35,7 +37,8 @@ The user invokes via:
 | `/aaarrr MyApp ios` | Skip Android entirely. |
 | `/aaarrr MyApp android` | Skip iOS entirely. |
 | `--window 30d` | Override window (7d, 30d, 90d, or YYYY-MM-DD..YYYY-MM-DD). |
-| `--refresh` | Force re-scrape even if cache < 1h. |
+| `--refresh` | Force re-fetch even if cache < 1h. |
+| `--no-pirate` | Render without the swashbuckler at the top of the HTML report. |
 | `--report-only` | Skip browser entirely, re-render from cached JSON. |
 
 If the app name has spaces, the user will quote it (`/aaarrr "My Cool App"`).
@@ -70,7 +73,7 @@ For each store in scope, look in `{SKILL_DIR}/reports/<slug>_<store>_<YYYYMMDD>.
 - Navigate:
   - iOS: `https://appstoreconnect.apple.com/apps`
   - Android: `https://play.google.com/console/u/0/developers/`
-- Inject a tiny detection probe via `mcp__Claude_in_Chrome__javascript_tool` that returns `{ ready: boolean, reason: string }`. "Ready" is stricter than "signed in" — it means the scraper can actually run without any further human action. Define it per store:
+- Inject a tiny detection probe via `mcp__Claude_in_Chrome__javascript_tool` that returns `{ ready: boolean, reason: string }`. "Ready" is stricter than "signed in" — it means Claude can actually read the dashboard without any further human action. Define it per store:
 
   **iOS (App Store Connect) — ready iff ALL hold:**
   - URL contains `appstoreconnect.apple.com/apps` (no `/login`, no `idmsa.apple.com` redirect, no Sign-In iframe).
@@ -94,7 +97,7 @@ The two stores need different strategies:
 App resolution order: `forceAppId` → URL-embedded id → exact name match → single substring → multiple substrings (returns `{ error: "ambiguous_app", candidates: [...] }`, ask the user to pick via `AskUserQuestion`). After resolution, run `asc_public_scrape.js` against `https://apps.apple.com/us/app/id<APP_STORE_ID>` to fetch public-page rating, rank, and editorial state. Merge under `asc_public`.
 
 #### Android — interactive, two-tier
-Play Console renders chart data on `<canvas>` elements with no text/aria fallback, so a single-shot scraper isn't possible. `play_scrape.js` exposes helper functions Claude calls between navigations.
+Play Console renders chart data on `<canvas>` elements with no text/aria fallback, so a single-shot read isn't possible. `play_scrape.js` exposes helper functions Claude calls between navigations.
 
 **Tier 1 (fast — gets all five AAARRR pillars at 28-day grain):**
 1. Navigate to `/console/u/0/developers/<devId>/app-list`.
@@ -118,7 +121,7 @@ Only run if the user explicitly asks for daily DoD/WoW chips on Play. For each c
 
 **Play data lag:** Play's chart values finalize 3–4 days after the day they refer to. The Play JSON's `windows` should record the actual data-end date (e.g. `yesterday: today-4`) so the report's window banner shows the correct iOS-vs-Android offset.
 
-After each store's scrape:
+After reading each store:
 1. Save raw JSON to `{SKILL_DIR}/reports/<slug>_<store>_<YYYYMMDD>.json`.
 2. If `errors` is non-empty, log a one-liner like *"⚠ apple_connect: 2 metrics unavailable"* but continue.
 
@@ -127,6 +130,8 @@ After each store's scrape:
 ### Step 5 — Render
 
 Run `node {SKILL_DIR}/scripts/build_report_html.mjs --slug <slug> --window <mode> --out <cwd>/aaarrr_<slug>_<YYYYMMDD>.html` via Bash. The script finds today's JSONs in `{SKILL_DIR}/reports/`, merges them, and writes a standalone HTML file (no external assets — tables are semantic `<table>` so they paste cleanly into Notion / Slack / Sheets).
+
+Pass `--no-pirate` if the user invoked `/aaarrr <app> --no-pirate` — suppresses the swashbuckling pirate at the top of the report.
 
 Pass `--date YYYYMMDD` if the user is regenerating an older day; the script defaults to today's **local** date (not UTC — local avoids the post-8pm-EDT flip that would miss the JSON cached earlier the same evening).
 
