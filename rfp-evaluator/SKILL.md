@@ -44,7 +44,9 @@ Run the bundled prep script — it extracts the full text layer and *triages* (i
 python3 scripts/prepare_rfp.py "<path-to-rfp>"
 ```
 
-It returns JSON: `text_file` (full document text), `scanned`, `image_candidate_pages` (pages with a large graphic and little text, each with a short `preview`), `key_extracts` (the lines that matched budget/dates/legal/evaluation patterns), `render_hint`, and `note`.
+It returns JSON: `text_file` (full document text), `scanned`, `image_candidate_pages` (pages with a large graphic and little text, each with a short `preview`), `key_extracts` (the lines that matched budget/dates/legal/evaluation patterns), `engine` (which PDF engine ran), and `note`.
+
+**No setup needed.** The scripts pick a PDF engine automatically: **poppler** if it's on PATH (fast), otherwise **pypdfium2** — a pip wheel they auto-install into `~/.virtualenvs/rfp-pdf` on first use (no Homebrew/admin). You don't install anything.
 
 Then:
 
@@ -54,13 +56,13 @@ Then:
    - If `text_file` is short (a typical born-digital RFP), just read it through — you're done.
 2. **Look at `image_candidate_pages` and judge from each `preview` whether vision is actually needed:**
    - If the preview shows the page's content is already in the text (a cover, a section divider, a "Thank you" slide, a photo with a caption) → **skip it. Render nothing.**
-   - Only if a candidate is genuinely image-only — a floor plan, an org chart, a scanned exhibit, a diagram whose meaning isn't in the text (preview is just a sheet title like "EXHIBIT A — EXISTING BUILDING") → render *that* page and read it:
-     `pdftoppm -jpeg -r 110 -gray -f N -l N "<pdf>" /tmp/rfp_p` then `Read /tmp/rfp_p-NN.jpg`. Render several at once if needed; one Bash call.
+   - Only if a candidate is genuinely image-only — a floor plan, an org chart, a scanned exhibit, a diagram whose meaning isn't in the text (preview is just a sheet title like "EXHIBIT A — EXISTING BUILDING") → render those pages and read them:
+     `python3 scripts/render_pages.py "<pdf>" 13,14 /tmp/rfp_pages` (the `note` field shows the exact command; pages accept a comma list and/or ranges like `1-20`), then `Read` each image path it prints. One Bash call for several pages.
    - When you do read a figure, map it to a criterion (floor/phase plan → Scope; Gantt → Timeline; fee table → Budget; org/RACI → Governance) and, if it contradicts the prose, **trust the figure** and flag it.
-3. **If `scanned` is true**, there's no usable text — render all pages (use `render_hint`) and vision-read them.
-4. If the prose explicitly references a figure that matters (e.g. "see the schedule in Exhibit C") and it wasn't a candidate, render that page too. Never drop decision-relevant visual evidence to save time — but equally, never render a page whose content you already have in text.
+3. **If `scanned` is true**, there's no usable text — render all pages with `render_pages.py` (the `note` gives the exact command) and vision-read them.
+4. If the prose explicitly references a figure that matters (e.g. "see the schedule in Exhibit C") and it wasn't a candidate, render that page too with `render_pages.py`. Never drop decision-relevant visual evidence to save time — but equally, never render a page whose content you already have in text.
 
-If the script reports `needs_install`, run `brew install poppler` once, then re-run it. For a **non-PDF** (Word/RTF/text): skip the script, just `Read` the file.
+If the script reports `needs_install`, the pypdfium2 auto-install was blocked (rare — e.g. no network/pip); installing poppler (`brew install poppler`) is the fallback. For a **non-PDF** (Word/RTF/text): skip the script, just `Read` the file.
 
 Net effect: a text RFP renders nothing and runs fast; an RFP with real plans/diagrams renders only those few pages. Either way you've covered the whole document — don't analyze a partial RFP; if you genuinely couldn't read part of it, say so.
 
