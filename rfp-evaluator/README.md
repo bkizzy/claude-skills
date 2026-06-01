@@ -22,14 +22,20 @@ Six criteria, default weights: Budget 30 · Scope 25 · Timeline 15 · Goals 10 
 | --- | --- |
 | `SKILL.md` | Instructions Claude reads at runtime (the workflow). |
 | `references/scoring-rubric.md` | Criteria anchors, gate definitions, X-ray dimensions, weight slot rule. |
+| `scripts/_pdf_engine.py` | Picks the PDF engine: poppler if present, else bootstraps pypdfium2 in a venv and re-execs. Shared by the two scripts below. |
 | `scripts/prepare_rfp.py` | Extracts text, triages which pages (if any) need vision, returns targeted budget/date/legal extracts. Does **not** auto-render. |
+| `scripts/render_pages.py` | Renders specific pages to grayscale JPEGs for vision — via whichever engine is active. |
 | `scripts/render_report.py` | Builds the HTML report from a compact `eval.json` (keeps the big HTML/CSS out of the model's output). |
 | `assets/report-template.html` | Visual reference for the report layout (the script is the actual renderer). |
 
 ## Requirements
 
-- **poppler** for PDF text extraction and page rendering: `brew install poppler` (provides `pdftotext`, `pdfinfo`, `pdfimages`, `pdftoppm`). The script auto-locates the binary on Apple Silicon (`/opt/homebrew/bin`).
-- Python 3 (standard library only — no pip installs, no network).
+**Nothing to install.** The PDF scripts auto-select an engine:
+
+- **poppler** if it's already on PATH (`pdftotext`/`pdfinfo`/`pdfimages`/`pdftoppm`) — fast, and the harness's own `Read` tool uses it too. Auto-located on Apple Silicon (`/opt/homebrew/bin`).
+- otherwise **pypdfium2** — a pip wheel that bundles PDFium (Chromium's PDF engine), auto-installed into `~/.virtualenvs/rfp-pdf` on first use. No Homebrew, no admin; works anywhere Python does.
+
+Python 3 only (standard library + the auto-installed `pypdfium2` on the fallback path). Force the fallback for testing with `RFP_ENGINE=pdfium`. No network calls during evaluation — `pypdfium2` is fetched once at install time.
 
 ## Usage
 
@@ -42,6 +48,6 @@ It asks your role + priorities, reads the document, and writes `<RFP name> - Eva
 ## Known gaps / rot points
 
 - **Document-only by design.** No web search, so it won't surface external context (incumbent reputation, typical market budgets, competitor pool size) — those are marked "Not specified in RFP." A web-augmented mode would need to be a separate, clearly-walled-off opt-in so it never contaminates the grounded score.
-- **poppler is a hard dependency.** Without it, the prep script reports `needs_install` and the skill can't read PDFs.
+- **No hard system dependency** — poppler is used if present, else pypdfium2 is auto-installed. `needs_install` only appears if *both* are unavailable (e.g. no network for the one-time pip install and no poppler).
 - **Scanned PDFs** fall back to rendering every page (slower) since there's no text layer.
 - The PDF page count from poppler can differ from a viewer's count; the skill trusts poppler.
