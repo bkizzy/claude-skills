@@ -18,3 +18,7 @@ npm-debug.log*
 
 # Local Claude state
 .claude/
+
+# Python
+__pycache__/
+*.pyc
