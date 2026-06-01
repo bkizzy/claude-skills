@@ -25,26 +25,30 @@ shows `—` in the report, come here, patch, re-run with `--refresh`.
 
 ### Measure keys
 
-These are the `measures[]` strings the time-series endpoint accepts. If a
-measure name has changed, check the Analytics page's network panel for the
-current key — Apple sometimes renames (`installs` ↔ `installations`).
+The `measures[]` strings the time-series endpoint accepts. **Source of truth is `scripts/asc_private_scrape.js` (the `SUM_MEASURES` / `RATE_MEASURES` tables)** — the values below are what's wired in there as of the last successful run. Apple's analytics API is internal and undocumented; names rotate without notice. When something starts returning HTTP 400 / empty data, open DevTools → Network on the Analytics page, find the failing POST to `/analytics/api/v1/data/time-series`, read the `measures[0]` from the request body, and update **both** this table and the corresponding entry in the scraper.
 
-```
-impressionsTotalUnique
-pageViewUnique
-installs
-redownloads
-installsConversionRate
-activeDevices
-sessions
-sessionsPerActiveDevice
-crashes
-payingUserProceeds
-iapPurchases
-activeSubscriptions
-proceedsPerPayingUser
-userRetention      ← uses frequency "total" + a `day` field in response
-```
+**AAARRR field → API measure name → status:**
+
+| Pillar / field | Schema key | API `measures[]` string | Status |
+| --- | --- | --- | --- |
+| Awareness — impressions | `awareness.impressions` | `impressionsTotalUnique` | ✅ verified |
+| Awareness — page views | `awareness.page_views` | `pageViewUnique` | ✅ verified |
+| Acquisition — first downloads | `acquisition.first_downloads` | `units` | ✅ verified (NOT `installs` — Apple renamed) |
+| Acquisition — redownloads | `acquisition.redownloads` | `redownloads` | ✅ verified |
+| Acquisition — conversion rate | `acquisition.conversion_rate` | `conversionRate` | ✅ verified · rate · returns 0–100, scraper divides by 100 on intake |
+| Activation — active devices | `activation.active_devices` | `activeDevices` | ✅ verified |
+| Activation — sessions | `activation.sessions` | `sessions` | ✅ verified |
+| Activation — sessions / device | `activation.sessions_per_device` | _(derived)_ | sums(sessions) / sums(activeDevices) per window in `deriveRatio()` |
+| Activation — crashes | `activation.crashes` | `crashes` | ✅ verified · count, not rate |
+| Revenue — proceeds (USD) | `revenue.proceeds_usd` | `proceeds` | ✅ verified |
+| Revenue — IAP transactions | `revenue.iap_count` | `iap` | ✅ verified |
+| Revenue — paying users | `revenue.paying_users` | `payingUsers` | ✅ verified |
+| Revenue — ARPU | `revenue.arpu` | _(derived)_ | sums(proceeds) / sums(payingUsers) per window |
+| Revenue — active subscriptions | `revenue.active_subs` | ❌ **not yet mapped** | Subscriptions endpoint TBD — likely `/analytics/api/v1/data/...` with `subscriptionState` filter |
+| Retention — D1/D7/D14/D28 | `retention.d1` etc. | ❌ **not yet mapped** | Apple's retention chart uses a different endpoint shape (frequency `"total"` + a `day` dimension). Best guess for the measure name is `userRetention`; needs DevTools capture. |
+| Referral — by_source | `referral.by_source` | `totalDownloads` grouped by `source` | ✅ verified · hits `/analytics/api/v1/data/dimension-values` (different endpoint) |
+
+The candidates listed previously here (`installs`, `installsConversionRate`, `payingUserProceeds`, `iapPurchases`, `proceedsPerPayingUser`) were either renamed by Apple or never accepted — kept as a reference of **what NOT to use** in case someone searches old notes.
 
 ### Detection probe (Step 3 of SKILL.md)
 
