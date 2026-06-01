@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<!--
+  RFP Evaluator report template.
+  Fill in everything in {{double braces}} and the repeating rows/cards.
+  Delete sections that genuinely don't apply (e.g. "Charts & figures read" if the
+  source had no figures). Keep it self-contained: no external CSS/JS/fonts.
+  Color convention: green = #1a7f4b, yellow = #b8860b, red = #c0392b.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFP Evaluation — {{rfp_title}}</title>
+<style>
+  :root{
+    --green:#1a7f4b; --green-bg:#e6f4ec;
+    --yellow:#b8860b; --yellow-bg:#fbf3e0;
+    --red:#c0392b; --red-bg:#fbeae8;
+    --ink:#1c2430; --muted:#5b6776; --line:#e3e8ee; --bg:#f6f8fa; --card:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 24px 80px}
+  .copybtn{position:fixed;top:16px;right:16px;z-index:10;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;
+    font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .copybtn:hover{background:var(--bg)}
+  h1{font-size:26px;margin:0 0 4px}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:15px;margin:18px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .sub{color:var(--muted);margin:0 0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:14px 0}
+  /* Score header */
+  .scorehead{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .scoreball{width:128px;height:128px;border-radius:50%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;color:#fff;flex:0 0 auto}
+  .scoreball .n{font-size:44px;font-weight:700;line-height:1}
+  .scoreball .l{font-size:12px;text-transform:uppercase;letter-spacing:.08em;opacity:.9}
+  .bg-green{background:var(--green)} .bg-yellow{background:var(--yellow)} .bg-red{background:var(--red)}
+  .verdict{flex:1;min-width:240px}
+  .verdict .call{font-size:22px;font-weight:700;margin:0 0 4px}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .pill.green{background:var(--green-bg);color:var(--green)}
+  .pill.yellow{background:var(--yellow-bg);color:var(--yellow)}
+  .pill.red{background:var(--red-bg);color:var(--red)}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:10px;font-size:14px;color:var(--muted)}
+  .meta b{color:var(--ink)}
+  /* Flags */
+  .flag{border-left:4px solid var(--red);background:var(--red-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:8px 0}
+  .flag.yellow{border-color:var(--yellow);background:var(--yellow-bg)}
+  .flag .t{font-weight:600}
+  .flag .i{font-size:14px;color:var(--muted)}
+  /* Tables */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.green{background:var(--green)} .dot.yellow{background:var(--yellow)} .dot.red{background:var(--red)}
+  .totalrow td{font-weight:700;border-top:2px solid var(--line);border-bottom:none}
+  .gateline{font-size:14px;color:var(--red);margin-top:8px}
+  /* lists / two-view */
+  ul{margin:6px 0 6px 0;padding-left:20px}
+  li{margin:3px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .xray .one{font-weight:600;margin:0 0 2px}
+  .cite{color:var(--muted);font-size:13px}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<button class="copybtn" onclick="copyDoc()">Copy report</button>
+<div class="wrap" id="doc">
+
+  <!-- ============ HEADER ============ -->
+  <h1>{{rfp_title}}</h1>
+  <p class="sub">{{client_name}} · Evaluated {{eval_date}}</p>
+
+  <div class="card scorehead">
+    <div class="scoreball bg-{{color}}">
+      <div class="n">{{overall_score}}</div>
+      <div class="l">{{COLOR}}</div>
+    </div>
+    <div class="verdict">
+      <p class="call">{{bid_call}}</p> <!-- e.g. "Proceed — but get 3 clarifications first" -->
+      <span class="pill {{color}}">{{color_label}}</span> <!-- Green / Yellow / Red -->
+      <p style="margin:10px 0 0">{{one_line_rationale}}</p>
+      <div class="meta">
+        <span><b>Deadline:</b> {{deadline}} ({{countdown}})</span>
+        <span><b>Duration:</b> {{duration}}</span>
+        <span><b>Rubric:</b> {{weighted_total}}/100</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RED FLAGS (only if any) ============ -->
+  <h2>Red flags & dealbreakers</h2>
+  <!-- Repeat .flag per gate/issue. Use class "flag" for red, "flag yellow" for yellow. -->
+  <div class="flag">
+    <div class="t">{{flag_title}}</div>
+    <div class="i">{{flag_impact}} <span class="cite">({{citation}})</span></div>
+  </div>
+  <!-- If a gate capped the score, state it plainly: -->
+  <p class="gateline">{{gate_explanation}}</p>
+
+  <!-- ============ SCORE BREAKDOWN ============ -->
+  <h2>Score breakdown</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Criterion</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Contribution</th><th>Rationale (evidence)</th></tr></thead>
+      <tbody>
+        <!-- Repeat one row per criterion -->
+        <tr>
+          <td><span class="dot {{flag_color}}"></span>{{criterion_name}}</td>
+          <td class="num">{{score}}</td>
+          <td class="num">{{weight}}%</td>
+          <td class="num">{{contribution}}</td>
+          <td>{{rationale}} <span class="cite">({{citation}})</span></td>
+        </tr>
+        <tr class="totalrow">
+          <td>Weighted total</td><td class="num">{{weighted_total}}</td><td class="num">100%</td><td class="num"></td>
+          <td>{{gated_note}}</td> <!-- e.g. "Capped at 59 by hostile-legal gate → final 59" or "No gates → final 66" -->
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ CHARTS & FIGURES READ (only if source had figures) ============ -->
+  <h2>Charts &amp; figures read</h2>
+  <div class="card">
+    <p class="sub" style="margin:0 0 10px">Visual elements interpreted directly from the document:</p>
+    <ul>
+      <!-- Repeat per figure -->
+      <li><b>{{figure_type}} (p.{{page}})</b> — {{what_it_revealed}}</li>
+    </ul>
+  </div>
+
+  <!-- ============ AGENCY VIEW ============ -->
+  <h2>Agency view — should we respond?</h2>
+
+  <h3>Background</h3>
+  <p>{{background}}</p>
+
+  <h3>Scope of work</h3>
+  <div class="card grid2">
+    <div><b>Deliverables</b><ul>{{deliverables_list}}</ul></div>
+    <div><b>Integrations</b><ul>{{integrations_list}}</ul></div>
+    <div><b>Phases</b><ul>{{phases_list}}</ul></div>
+    <div><b>Exclusions</b><ul>{{exclusions_list}}</ul></div>
+  </div>
+
+  <h3>Key dates</h3>
+  <ul>{{key_dates_list}}</ul> <!-- <li>{{date}} — {{description}}</li> -->
+
+  <h3>RFP X-Ray</h3>
+  <div class="card xray">
+    <!-- Repeat per dimension: Competitiveness, Continuity/Change, Motivation, Engagement style, Decision process, Governance -->
+    <p class="one">{{dimension_name}}: {{one_line_read}}</p>
+    <p>{{details}} <span class="cite">({{citation_or_not_specified}})</span></p>
+    <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+    <p class="one">Current assessment</p>
+    <p>{{current_assessment}}</p>
+  </div>
+
+  <h3>Recommendation</h3>
+  <p>{{recommendation}}</p>
+  <p><b>Clarifications to request before bidding:</b></p>
+  <ul>{{clarifications_list}}</ul>
+
+  <!-- ============ SUBMITTER VIEW ============ -->
+  <h2>Submitter view — how to improve this RFP</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Area</th><th>Status</th><th>Feedback</th></tr></thead>
+      <tbody>
+        <!-- Repeat per criterion -->
+        <tr><td>{{category}}</td><td><span class="dot {{status_color}}"></span>{{status}}</td><td>{{feedback}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>Priority fixes</h3>
+  <ul>{{priority_actions_list}}</ul>
+  <h3>Narrative</h3>
+  <p>{{submitter_narrative}}</p>
+
+  <footer>Generated by the rfp-evaluator skill · Scores are decision support, not a substitute for legal/financial review.</footer>
+</div>
+
+<script>
+function copyDoc(){
+  const el=document.getElementById('doc');
+  const r=document.createRange();r.selectNode(el);
+  const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+  try{document.execCommand('copy');
+    const b=document.querySelector('.copybtn');const t=b.textContent;
+    b.textContent='Copied!';setTimeout(()=>b.textContent=t,1500);
+  }catch(e){alert('Press Cmd/Ctrl+C to copy');}
+  s.removeAllRanges();
+}
+</script>
+</body>
+</html>
