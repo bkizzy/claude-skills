@@ -1,5 +1,7 @@
 # Claude skills
 
+[![License: MIT](https://img.shields.io/github/license/bkizzy/claude-skills?style=flat-square)](./LICENSE)
+
 Custom [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) I've built. Each lives in its own folder with a `SKILL.md` (what Claude reads) and a `README.md` (what humans read).
 
 ## Skills
