@@ -1,24 +1,29 @@
 # macOS
 .DS_Store
 
-# Editor noise
+# Editor / IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Node
+# Node — no deps yet, but keep the safety net
 node_modules/
 npm-debug.log*
 
-# Skill caches — raw scraped JSON is per-user, never committed
-*/reports/*.json
-*/reports/*.summary.json
-# Generated reports if someone runs /aaarrr while cwd'd into the repo (anchored to root)
-/aaarrr_*_[0-9]*.md
-
-# Local Claude state
-.claude/
-
-# Python
+# Python — used by ad-hoc utility scripts (image processing, sample generation)
 __pycache__/
 *.pyc
+.venv/
+
+# Local Claude Code session state (per-machine, never committed)
+.claude/
+
+# Per-user report caches — every skill writes its JSON here, never tracked
+*/reports/*.json
+*/reports/*.summary.json
+
+# Generated reports if someone runs a skill while cwd'd into this repo
+/aaarrr_*_[0-9]*.html
+/aaarrr_*_[0-9]*.md
+/aaarrr_*_[0-9]*.summary.json
