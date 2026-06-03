@@ -1,30 +1,33 @@
 ---
 name: phoenix-errors
 description: >
-  Set up Arize Phoenix from scratch, connect it to Claude as an MCP server, and
-  produce a multi-sheet error report from your trace data. Walks first-time users
-  through standing up Phoenix (Phoenix Cloud, local pip/docker, or a self-hosted
-  instance), wiring it into Claude Desktop or Claude Code/Cowork, then pulling
-  ERROR spans and rendering a color-coded Excel workbook + self-contained HTML
-  summary with root-cause and prioritized recommendations. Lets you pick one or
-  more projects via a multi-select checkbox. Invoked as /phoenix-errors. Use
-  whenever the user wants to set up Phoenix, connect Phoenix or Arize as an MCP,
-  mentions "phoenix error report", "arize error report", "LLM trace errors",
-  "observability error report", or wants to analyze errors/failures across their
-  Phoenix projects — even if they don't say the exact phrase.
+  Connect Arize Phoenix (the open-source LLM-observability / tracing platform) to
+  Claude as an MCP server, then produce a multi-sheet error report from your trace
+  data. Walks you through wiring Phoenix into Claude Desktop or Claude Code/Cowork
+  (and standing up a Phoenix instance first — Cloud, local pip/docker, or
+  self-hosted — only if you don't already have one), then pulling ERROR spans and
+  rendering a color-coded Excel workbook + self-contained HTML summary with
+  root-cause and prioritized recommendations. Lets you pick one or more projects
+  via a multi-select checkbox. Invoked as /phoenix-errors. Use whenever the user
+  wants to connect Phoenix or Arize to Claude as an MCP, mentions "phoenix error
+  report", "arize error report", "LLM trace errors", "observability error report",
+  or wants to analyze errors/failures across their Phoenix projects — even if they
+  don't say the exact phrase.
 version: 0.1.0
 ---
 
-# `/phoenix-errors` — Phoenix setup + error report
+# `/phoenix-errors` — connect Phoenix to Claude + error report
+
+[Arize Phoenix](https://phoenix.arize.com) is an open-source LLM-observability / tracing platform — it captures the spans (calls, agents, tools, errors) your AI app emits so you can debug and evaluate them.
 
 ## What this skill does
 
-Two jobs, in order. Most of the time only Phase B runs (setup is a one-time thing).
+Two jobs, in order. Most of the time only Phase B runs (the connection is a one-time thing).
 
-- **Phase A — Setup (first run only):** Get a Phoenix instance reachable and connected to Claude as an MCP server. Covers all three deployment flavors and two clients.
+- **Phase A — Connect Phoenix to Claude (first run only):** Wire a Phoenix instance into Claude as an MCP server. This skill does *not* run your app's tracing — it connects to a Phoenix that's already (or about to be) collecting traces. If you don't have a Phoenix instance yet, it helps you stand one up first (Cloud, local, or self-hosted), then connects it to Claude Desktop or Claude Code/Cowork.
 - **Phase B — Error report:** List the user's Phoenix projects, let them check off one or more, pull the ERROR spans (plus a small healthy sample) in a time window, categorize them, and render an Excel workbook (`scripts/build_report.py`) plus a self-contained HTML summary — including a **Diagnostics** view (latency, token usage, error-rate, concentration, redelivery-loop detection, errors-over-time).
 
-The split matters because setup is friction the user pays once, while the report is the thing they'll re-run. Always start by checking whether Phoenix is *already* connected — if it is, skip straight to Phase B so returning users aren't dragged back through install steps.
+The split matters because connecting is friction the user pays once, while the report is the thing they'll re-run. Always start by checking whether Phoenix is *already* connected — if it is, skip straight to Phase B so returning users aren't dragged back through the connection steps.
 
 ## Invocation
 
@@ -40,7 +43,7 @@ If invoked with no args, run the full flow.
 
 ---
 
-## Phase A — Setup (first run only)
+## Phase A — Connect Phoenix to Claude (first run only)
 
 ### A1 — Detect whether Phoenix is already connected
 
