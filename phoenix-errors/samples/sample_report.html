@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferndale Field Guide — Phoenix Error Report</title>
+<style>
+  :root { --ink:#1f2933; --accent:#1F4E78; --line:#e3e8ee; }
+  * { box-sizing:border-box; }
+  body { font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); max-width:1000px; margin:0 auto; padding:32px 24px 80px; background:#fff; }
+  h1 { color:var(--accent); font-size:26px; margin:0 0 4px; }
+  .meta { color:#6b7785; font-size:13px; margin-bottom:24px; }
+  h2 { color:var(--accent); font-size:18px; margin:32px 0 10px; }
+  table { border-collapse:collapse; width:100%; margin:8px 0 4px; font-size:13.5px; }
+  th { background:var(--accent); color:#fff; text-align:left; padding:8px 10px; font-weight:600; }
+  td { padding:8px 10px; border:1px solid var(--line); vertical-align:top; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px;
+    font-weight:700; color:#5a3030; margin-left:4px; }
+  .totals { display:flex; gap:24px; flex-wrap:wrap; margin:8px 0 4px; }
+  .totals div { background:#f5f7fa; border:1px solid var(--line); border-radius:8px; padding:10px 16px; }
+  .totals b { display:block; font-size:22px; color:var(--accent); }
+  .totals span { font-size:12px; color:#6b7785; }
+  #copy { position:fixed; top:16px; right:16px; background:var(--accent); color:#fff; border:0;
+    border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer; box-shadow:0 1px 4px #0002; }
+  #copy:active { transform:translateY(1px); }
+</style></head><body>
+<button id="copy" onclick="copyReport()">Copy report</button>
+<div id="report">
+<h1>Ferndale Field Guide — Phoenix Error Report</h1>
+<div class="meta">Date: 2026-06-02  ·  Window: 2026-05-26 .. 2026-06-02 (7d, UTC). NOTE: sample/illustrative data — not from a live instance.  ·  Source: app.phoenix.arize.com</div>
+
+<div class="totals">
+  <div><b>49</b><span>error spans</span></div>
+  <div><b>14</b><span>distinct traces</span></div>
+  <div><b>5</b><span>users affected</span></div>
+  <div><b>010:1 – 14:37</b><span>window (UTC)</span></div>
+</div>
+
+<h2>By Project</h2>
+<table><thead><tr><th>Project</th><th>Errors</th><th>Traces</th><th>Users</th><th>Note</th></tr></thead>
+<tbody><tr><td>ferndale_prod</td><td class='num'>9</td><td class='num'>4</td><td class='num'>4</td><td></td></tr><tr><td>ferndale_staging</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td>no errors (clean)</td></tr><tr><td>ferndale_qa</td><td class='num'>40</td><td class='num'>10</td><td class='num'>1</td><td>active storm — one user looping</td></tr></tbody></table>
+
+<h2>By Error Family</h2>
+<table><thead><tr><th>Error Family</th><th>Count</th><th>% of Total</th><th>Root Cause</th><th>Recommended Action</th></tr></thead>
+<tbody><tr style="background:#F8D7DA33"><td>Context window exceeded <span class="badge" style="background:#F8D7DA">P0</span></td><td class='num'>40</td><td class='num'>81.6%</td><td>A long identification session accumulates the full photo+chat history every call; for user_7f3c2a it grew past the model&#x27;s 128k limit and never recovers, so every turn fails and is retried.</td><td>Cap/summarize session history under a token budget; add a per-session circuit breaker that stops replaying a maxed-out session.</td></tr><tr style="background:#FFE8CC33"><td>Image decode failure (ValueError) <span class="badge" style="background:#FFE8CC">P1</span></td><td class='num'>6</td><td class='num'>12.2%</td><td>Some uploads are HEIC variants the preprocessor can&#x27;t decode, so identification fails before the model runs.</td><td>Transcode/validate images client-side (HEIC→JPEG); reject unsupported formats with a friendly message.</td></tr><tr style="background:#FFF3CD33"><td>Rate limit (429) <span class="badge" style="background:#FFF3CD">P2</span></td><td class='num'>3</td><td class='num'>6.1%</td><td>Vision endpoint returns 429 (queue full) during traffic spikes.</td><td>Add retry-with-exponential-backoff; consider a fallback vision model for sustained load.</td></tr></tbody></table>
+
+<h2>Recommendations</h2>
+<table><thead><tr><th>Priority</th><th>Issue</th><th>Action</th></tr></thead>
+<tbody><tr style="background:#F8D7DA33"><td><span class="badge" style="background:#F8D7DA">P0</span></td><td>Runaway context-window storm in ferndale_qa — one session looping ~40 failures.</td><td>Reset/clear the stuck session; cap history and add a circuit breaker so it can&#x27;t recur.</td></tr><tr style="background:#FFE8CC33"><td><span class="badge" style="background:#FFE8CC">P1</span></td><td>Image decode failures hit real users in prod.</td><td>Transcode HEIC client-side; validate before upload.</td></tr><tr style="background:#FFF3CD33"><td><span class="badge" style="background:#FFF3CD">P2</span></td><td>No error-rate alerting.</td><td>Alert on error-rate spikes per project so a single looping session can&#x27;t burn quota silently.</td></tr></tbody></table>
+
+<h2>Diagnostics</h2>
+<p style="color:#6b7785;font-size:12.5px;margin:0 0 12px">
+  <b>How to read the numbers:</b> times are in seconds and tokens are counts.
+  <b>Average</b> = the mean. <b>Median (p50)</b> = the typical case — half are faster, half slower.
+  <b>95th percentile (p95)</b> = the slow tail — only the worst 5% are above this.
+  Latency rows are split into <b>Failed (time-to-fail)</b> = how long an operation churned before erroring, and
+  <b>Healthy (successful)</b> = how long successful operations actually took.
+</p>
+<h3 style="color:#1F4E78;font-size:15px;margin:18px 0 4px">Error rate by project</h3>
+<table><thead><tr><th>Project</th><th>Errors</th><th>Total</th><th>Error %</th><th>Basis</th></tr></thead>
+<tbody><tr><td>ferndale_prod</td><td class='num'>9</td><td class='num'>4133</td><td class='num'>0.2%</td><td>reported totals</td></tr><tr><td>ferndale_qa</td><td class='num'>40</td><td class='num'>58</td><td class='num'>69.0%</td><td>reported totals</td></tr><tr><td>ferndale_staging</td><td class='num'>0</td><td class='num'>0</td><td class='num'>n/a</td><td>SAMPLED (err+ok sample)</td></tr></tbody></table>
+
+<h3 style="color:#1F4E78;font-size:15px;margin:18px 0 4px">Latency (seconds) — by project &amp; span kind</h3>
+<table><thead><tr><th>Project</th><th>Span kind</th><th>Span set</th><th>Count</th><th>Average</th><th>Median (p50)</th><th>95th pct (p95)</th></tr></thead>
+<tbody><tr><td>ferndale_prod</td><td>AGENT</td><td>Failed (time-to-fail)</td><td class='num'>1</td><td class='num'>0.60</td><td class='num'>0.60</td><td class='num'>0.60</td></tr><tr><td>ferndale_prod</td><td>CHAIN</td><td>Failed (time-to-fail)</td><td class='num'>2</td><td class='num'>0.75</td><td class='num'>0.75</td><td class='num'>0.89</td></tr><tr><td>ferndale_prod</td><td>LLM</td><td>Failed (time-to-fail)</td><td class='num'>1</td><td class='num'>0.60</td><td class='num'>0.60</td><td class='num'>0.60</td></tr><tr><td>ferndale_prod</td><td>TOOL</td><td>Failed (time-to-fail)</td><td class='num'>1</td><td class='num'>0.60</td><td class='num'>0.60</td><td class='num'>0.60</td></tr><tr><td>ferndale_qa</td><td>AGENT</td><td>Failed (time-to-fail)</td><td class='num'>20</td><td class='num'>10.35</td><td class='num'>10.35</td><td class='num'>10.70</td></tr><tr><td>ferndale_qa</td><td>CHAIN</td><td>Failed (time-to-fail)</td><td class='num'>10</td><td class='num'>11.40</td><td class='num'>11.40</td><td class='num'>11.40</td></tr><tr><td>ferndale_qa</td><td>LLM</td><td>Failed (time-to-fail)</td><td class='num'>10</td><td class='num'>3.80</td><td class='num'>3.80</td><td class='num'>3.80</td></tr><tr><td>ferndale_prod</td><td>CHAIN</td><td>Healthy (successful)</td><td class='num'>2</td><td class='num'>4.75</td><td class='num'>4.75</td><td class='num'>5.06</td></tr><tr><td>ferndale_prod</td><td>LLM</td><td>Healthy (successful)</td><td class='num'>3</td><td class='num'>0.97</td><td class='num'>1.00</td><td class='num'>1.00</td></tr><tr><td>ferndale_prod</td><td>TOOL</td><td>Healthy (successful)</td><td class='num'>1</td><td class='num'>0.30</td><td class='num'>0.30</td><td class='num'>0.30</td></tr></tbody></table>
+
+<h3 style="color:#1F4E78;font-size:15px;margin:18px 0 4px">Token usage by model</h3>
+<table><thead><tr><th>Model</th><th>Prompt average</th><th>Prompt 95th pct</th><th>Completion average</th><th>Total average</th><th>Total 95th pct</th></tr></thead>
+<tbody><tr><td>openai/gpt-4o-mini</td><td class='num'>3246.67</td><td class='num'>3588.00</td><td class='num'>156.67</td><td class='num'>3403.33</td><td class='num'>3791.00</td></tr></tbody></table>
+
+<h3 style="color:#1F4E78;font-size:15px;margin:18px 0 4px">Redelivery loops — top user = 82% of all errors</h3>
+<table><thead><tr><th>Session ID</th><th>Message ID (mid)</th><th>Repeats</th></tr></thead>
+<tbody><tr><td>sess_qa_storm</td><td>msg_fern_a…</td><td class='num'>5</td></tr><tr><td>sess_qa_storm</td><td>msg_fern_b…</td><td class='num'>5</td></tr></tbody></table>
+
+<h3 style="color:#1F4E78;font-size:15px;margin:18px 0 4px">Errors over time (hourly, UTC)</h3>
+<table><thead><tr><th>Hour</th><th>Errors</th><th>Volume</th></tr></thead>
+<tbody><tr><td>2026-06-02 01:00</td><td class='num'>4</td><td style='font-family:monospace;color:#1F4E78'>████</td></tr><tr><td>2026-06-02 09:00</td><td class='num'>2</td><td style='font-family:monospace;color:#1F4E78'>██</td></tr><tr><td>2026-06-02 12:00</td><td class='num'>3</td><td style='font-family:monospace;color:#1F4E78'>███</td></tr><tr><td>2026-06-02 14:00</td><td class='num'>40</td><td style='font-family:monospace;color:#1F4E78'>████████████████████████████████████████</td></tr></tbody></table>
+</div>
+<script>
+function copyReport() {
+  const r = document.getElementById('report');
+  const sel = window.getSelection(); const range = document.createRange();
+  range.selectNodeContents(r); sel.removeAllRanges(); sel.addRange(range);
+  try { document.execCommand('copy'); const b=document.getElementById('copy');
+    b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy report',1500); } catch(e){}
+  sel.removeAllRanges();
+}
+</script>
+</body></html>

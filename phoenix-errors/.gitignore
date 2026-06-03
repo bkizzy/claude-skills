@@ -1,0 +1,8 @@
+# Generated reports + working data — may contain real PII / customer data. Never commit.
+reports/*
+!reports/.gitkeep
+
+# OS / Python cruft
+.DS_Store
+__pycache__/
+*.pyc

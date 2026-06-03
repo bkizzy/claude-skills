@@ -1,0 +1,72 @@
+{
+  "report_title": "Ferndale Field Guide \u2014 Phoenix Error Report",
+  "source": "app.phoenix.arize.com",
+  "date": "2026-06-02",
+  "window": "2026-05-26 .. 2026-06-02 (7d, UTC). NOTE: sample/illustrative data \u2014 not from a live instance.",
+  "projects": [
+    {
+      "name": "ferndale_prod",
+      "queried": true
+    },
+    {
+      "name": "ferndale_staging",
+      "queried": true,
+      "note": "no errors (clean)"
+    },
+    {
+      "name": "ferndale_qa",
+      "queried": true,
+      "note": "active storm \u2014 one user looping"
+    }
+  ],
+  "totals": {
+    "ferndale_prod": {
+      "errors": 13,
+      "ok": 4120
+    },
+    "ferndale_qa": {
+      "errors": 40,
+      "ok": 18
+    }
+  },
+  "families": [
+    {
+      "family": "Context window exceeded",
+      "severity": "P0",
+      "root_cause": "A long identification session accumulates the full photo+chat history every call; for user_7f3c2a it grew past the model's 128k limit and never recovers, so every turn fails and is retried.",
+      "action": "Cap/summarize session history under a token budget; add a per-session circuit breaker that stops replaying a maxed-out session."
+    },
+    {
+      "family": "Image decode failure (ValueError)",
+      "severity": "P1",
+      "root_cause": "Some uploads are HEIC variants the preprocessor can't decode, so identification fails before the model runs.",
+      "action": "Transcode/validate images client-side (HEIC\u2192JPEG); reject unsupported formats with a friendly message."
+    },
+    {
+      "family": "Rate limit (429)",
+      "severity": "P2",
+      "root_cause": "Vision endpoint returns 429 (queue full) during traffic spikes.",
+      "action": "Add retry-with-exponential-backoff; consider a fallback vision model for sustained load."
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "P0",
+      "issue": "Runaway context-window storm in ferndale_qa \u2014 one session looping ~40 failures.",
+      "action": "Reset/clear the stuck session; cap history and add a circuit breaker so it can't recur."
+    },
+    {
+      "priority": "P1",
+      "issue": "Image decode failures hit real users in prod.",
+      "action": "Transcode HEIC client-side; validate before upload."
+    },
+    {
+      "priority": "P2",
+      "issue": "No error-rate alerting.",
+      "action": "Alert on error-rate spikes per project so a single looping session can't burn quota silently."
+    }
+  ],
+  "user_notes": {
+    "user_7f3c2a": "Storm \u2014 same identify request looping (sample data)."
+  }
+}
