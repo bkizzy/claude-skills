@@ -10,7 +10,7 @@ Custom [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) 
 | --- | --- |
 | [`aaarrr/`](./aaarrr/) | 🏴‍☠️ **App-store metrics, for pirates** — daily AAARRR report. Claude drives the Claude-in-Chrome extension to read App Store Connect + Play Console dashboards you're already signed into. No API keys. |
 | [`html-doc/`](./html-doc/) | Makes HTML the default document format — a single self-contained file with a click-to-copy button. Falls back to .md/.docx/.pdf/.xlsx/.pptx only when requested. |
-| [`phoenix-errors/`](./phoenix-errors/) | 🔭 **Arize Phoenix error reports** — sets up Phoenix, connects it to Claude as an MCP, then pulls ERROR spans across projects (multi-select) and renders an Excel + HTML report with a diagnostics view (error rate, latency, token usage, redelivery-loop detection). See [`samples/sample_report.html`](./phoenix-errors/samples/sample_report.html). |
+| [`phoenix-errors/`](./phoenix-errors/) | 🔭 **Arize Phoenix error reports** — Phoenix is an open-source LLM-observability/tracing platform; this skill walks you through connecting it to Claude as an MCP, then pulls ERROR spans across projects (multi-select) and renders an Excel + HTML report with a diagnostics view (error rate, latency, token usage, redelivery-loop detection). See the [sample report](./phoenix-errors/samples/sample_report.png). |
 | [`rfp-evaluator/`](./rfp-evaluator/) | Evaluates an RFP — reads the document (incl. charts/plans), scores it with a rubric + red-flag gates, and renders a role-tailored bid/no-bid HTML report. Document-grounded, no web search. |
 
 ## Install

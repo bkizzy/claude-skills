@@ -1,12 +1,16 @@
 # phoenix-errors
 
-Set up [Arize Phoenix](https://phoenix.arize.com) from scratch, connect it to Claude as an MCP server, and produce a multi-sheet **error report** from your LLM trace data — invoked as `/phoenix-errors`.
+Connect [Arize Phoenix](https://phoenix.arize.com) to Claude as an MCP server, then produce a multi-sheet **error report** from your trace data — invoked as `/phoenix-errors`.
+
+> **What's Phoenix?** [Arize Phoenix](https://phoenix.arize.com) is an open-source LLM-observability / tracing platform — it captures the spans (calls, agents, tools, errors) your AI app emits so you can debug and evaluate them. This skill reads from a Phoenix you're already running; it doesn't instrument your app.
+
+![Sample phoenix-errors report](./samples/sample_report.png)
 
 ## What it does
 
 Two phases:
 
-1. **Setup (one-time):** Detects whether Phoenix is already connected. If not, walks you through standing up Phoenix — **Phoenix Cloud**, **local** (pip/docker), or your own **self-hosted** instance — and wiring it into **Claude Desktop** or **Claude Code / Cowork** via `@arizeai/phoenix-mcp`.
+1. **Connect (one-time):** Detects whether Phoenix is already connected to Claude. If not, walks you through wiring it into **Claude Desktop** or **Claude Code / Cowork** via `@arizeai/phoenix-mcp` — and, only if you don't have a Phoenix instance yet, helps you stand one up first (**Phoenix Cloud**, **local** pip/docker, or **self-hosted**).
 2. **Error report:** Lists your Phoenix projects, lets you check off **one or more** (multi-select), pulls the `ERROR` spans (plus a small healthy sample) in a time window, categorizes them into error families with root cause + prioritized recommendations, and renders:
    - a color-coded **Excel workbook** (`Summary`, `Diagnostics`, `All Errors`, `By Trace`, `By User`, `Recommendations`)
    - a self-contained **HTML summary** with a click-to-copy button
@@ -33,6 +37,7 @@ phoenix-errors/
 │   ├── setup.md                # Phoenix install (all 3 flavors) + MCP connect (Desktop/Code)
 │   └── data-pull.md            # get-spans usage, attribute mapping, JSON schemas
 ├── samples/                    # synthetic data + a rendered example report
+│   ├── sample_report.png       # ← screenshot shown in this README
 │   ├── sample_report.html      # ← what the output looks like (open this)
 │   ├── sample_report.xlsx
 │   ├── sample_spans.json / sample_ok_spans.json / sample_analysis.json
