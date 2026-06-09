@@ -12,6 +12,7 @@ Custom [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) 
 | [`html-doc/`](./html-doc/) | Makes HTML the default document format — a single self-contained file with a click-to-copy button. Falls back to .md/.docx/.pdf/.xlsx/.pptx only when requested. |
 | [`phoenix-errors/`](./phoenix-errors/) | 🔭 **Arize Phoenix error reports** — Phoenix is an open-source LLM-observability/tracing platform; this skill walks you through connecting it to Claude as an MCP, then pulls ERROR spans across projects (multi-select) and renders an Excel + HTML report with a diagnostics view (error rate, latency, token usage, redelivery-loop detection). See the [sample report](./phoenix-errors/samples/sample_report.png). |
 | [`rfp-evaluator/`](./rfp-evaluator/) | Evaluates an RFP — reads the document (incl. charts/plans), scores it with a rubric + red-flag gates, and renders a role-tailored bid/no-bid HTML report. Document-grounded, no web search. |
+| [`screenshotr/`](./screenshotr/) | 📸 **Latest screenshots into the session** — auto-detects your macOS screenshot folder and pulls the newest N. A cheap Haiku subagent reads, downscales, and describes them — so the main thread only learns what each image is and where it lives. Optionally `--open`s them in Preview or renders an auto-refreshing `--html` gallery in Claude's preview pane. |
 
 ## Install
 
