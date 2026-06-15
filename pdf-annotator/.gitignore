@@ -1,0 +1,3 @@
+# Generated per-run artifacts (built viewer + captured notes)
+*.annotate.html
+*.notes.json

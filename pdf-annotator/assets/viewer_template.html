@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Annotate · __PDF_NAME__</title>
+<style>
+  :root{
+    --bg:#f4f4f2; --panel:#ffffff; --ink:#1a1a18; --muted:#6b6b66;
+    --line:#e3e3df; --accent:#c8643c; --accent-soft:rgba(200,100,60,.16);
+    --hl:rgba(255,214,102,.38); --hl-line:#e0a93b; --shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.06);
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);overflow:hidden}
+  .topbar{height:56px;display:flex;align-items:center;gap:16px;padding:0 18px;
+       background:var(--panel);border-bottom:1px solid var(--line);position:relative;z-index:30}
+  .topbar .name{font-weight:600;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .dot{color:var(--muted)}
+  .topbar .count{color:var(--muted);font-size:13px}
+  .topbar .spacer{flex:1}
+  .zoom{display:flex;align-items:center;gap:6px}
+  .zoom button{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:8px;
+       cursor:pointer;font-size:16px;color:var(--ink);line-height:1}
+  .zoom button:hover{background:#f0f0ee}
+  .zoom .pct{min-width:46px;text-align:center;color:var(--muted);font-size:13px}
+  .layout{display:flex;height:calc(100% - 56px)}
+  .viewer{flex:1;overflow:auto;padding:28px 0;display:flex;flex-direction:column;align-items:center;gap:22px}
+  .page{position:relative;background:#fff;box-shadow:var(--shadow);border-radius:4px}
+  .page canvas{display:block;border-radius:4px}
+  .textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;text-align:initial;
+       transform-origin:0 0;z-index:2;forced-color-adjust:none}
+  .textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+  .textLayer span::selection{background:rgba(120,150,255,.35)}
+  .textLayer span::-moz-selection{background:rgba(120,150,255,.35)}
+  .highlightLayer{position:absolute;inset:0;z-index:3;pointer-events:none}
+  .note-underline{position:absolute;background:var(--hl);border-bottom:2px solid var(--hl-line);
+       pointer-events:auto;cursor:pointer;border-radius:2px;transition:background .12s}
+  .note-underline:hover,.note-underline.active{background:rgba(255,193,77,.55)}
+  .pagenum{position:absolute;bottom:-20px;right:2px;font-size:11px;color:var(--muted)}
+  /* sidebar */
+  .sidebar{width:360px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+       display:flex;flex-direction:column}
+  .sidebar h2{margin:0;padding:16px 18px;font-size:14px;font-weight:600;border-bottom:1px solid var(--line);
+       display:flex;align-items:center;gap:8px}
+  .sidebar h2 .tag{margin-left:auto;background:var(--accent-soft);color:var(--accent);
+       font-size:12px;padding:2px 9px;border-radius:20px;font-weight:600}
+  .notes{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  .empty{color:var(--muted);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
+  .empty b{color:var(--ink)}
+  .note-card{border:1px solid var(--line);border-radius:var(--radius);background:#fff;padding:12px;
+       box-shadow:0 1px 2px rgba(0,0,0,.03);transition:border-color .12s,box-shadow .12s}
+  .note-card.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .note-card .meta{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .note-card .pg{font-size:11px;color:var(--muted);background:#f1f1ee;padding:2px 8px;border-radius:20px}
+  .note-card .del{margin-left:auto;border:none;background:none;color:var(--muted);cursor:pointer;
+       font-size:16px;line-height:1;padding:2px 4px;border-radius:6px}
+  .note-card .del:hover{background:#f5e7e3;color:var(--accent)}
+  .note-card blockquote{margin:0 0 9px;padding:6px 10px;border-left:3px solid var(--hl-line);
+       background:#fdf8ec;font-size:13px;color:#4a4a45;border-radius:0 6px 6px 0;
+       max-height:64px;overflow:auto}
+  .note-card textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+       font:inherit;font-size:13.5px;resize:vertical;min-height:54px;color:var(--ink);background:#fcfcfb}
+  .note-card textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  /* selection popup */
+  .sel-popup{position:fixed;z-index:50;transform:translate(-50%,-100%);display:none}
+  .sel-popup button{background:var(--ink);color:#fff;border:none;border-radius:8px;padding:7px 13px;
+       font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);white-space:nowrap}
+  .sel-popup button:hover{background:#000}
+  /* fab */
+  .fab{position:fixed;right:384px;bottom:26px;z-index:40;width:56px;height:56px;border-radius:50%;
+       border:none;background:var(--accent);color:#fff;font-size:26px;cursor:pointer;
+       box-shadow:0 6px 18px rgba(200,100,60,.4);display:flex;align-items:center;justify-content:center;
+       transition:transform .12s,background .12s}
+  .fab:hover{transform:scale(1.06);background:#b6582f}
+  .fab:disabled{background:#cfcfca;box-shadow:none;cursor:not-allowed;transform:none}
+  /* toast + modal */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;
+       padding:10px 18px;border-radius:10px;font-size:13.5px;z-index:60;opacity:0;pointer-events:none;
+       transition:opacity .2s,transform .2s;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .scrim{position:fixed;inset:0;background:rgba(20,20,18,.45);z-index:70;display:none;
+       align-items:center;justify-content:center;padding:20px}
+  .modal{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:26px;box-shadow:var(--shadow)}
+  .modal h3{margin:0 0 6px;font-size:19px;display:flex;align-items:center;gap:10px}
+  .modal .check{width:34px;height:34px;border-radius:50%;background:#e7f5ec;color:#2e8b57;
+       display:flex;align-items:center;justify-content:center;font-size:20px}
+  .modal p{color:var(--muted);margin:6px 0 16px;line-height:1.55}
+  .modal code{background:#f1f1ee;padding:2px 7px;border-radius:6px;font-size:13px;color:var(--ink)}
+  .modal .row{display:flex;gap:10px;margin-top:6px}
+  .modal button{border-radius:9px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff}
+  .modal button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .modal button.primary:hover{background:#b6582f}
+  .modal button:hover{background:#f5f5f3}
+  .modal pre{max-height:180px;overflow:auto;background:#1a1a18;color:#eee;padding:12px;border-radius:10px;
+       font-size:12px;margin:14px 0 0;display:none;white-space:pre-wrap;word-break:break-word}
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;
+       gap:14px;background:var(--bg);z-index:80;color:var(--muted)}
+  .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;
+       animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="name" id="docName">__PDF_NAME__</span>
+    <span class="dot">·</span>
+    <span class="count" id="docCount">0 notes</span>
+    <span class="spacer"></span>
+    <div class="zoom">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <span class="pct" id="zoomPct">100%</span>
+      <button id="zoomIn" title="Zoom in">+</button>
+    </div>
+  </div>
+  <div class="layout">
+    <main class="viewer" id="viewer"></main>
+    <aside class="sidebar">
+      <h2>Notes <span class="tag" id="sideCount">0</span></h2>
+      <div class="notes" id="notes">
+        <div class="empty" id="emptyState">
+          <b>Select any text</b> in the document to underline it and attach a note.<br><br>
+          When you're done, press the <b>✓</b> button to send your notes back to Claude.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <button class="fab" id="submitBtn" title="Submit notes to Claude" disabled>✓</button>
+  <div class="sel-popup" id="selPopup"><button id="addNoteBtn">＋ Add note</button></div>
+  <div class="toast" id="toast"></div>
+
+  <div class="scrim" id="scrim">
+    <div class="modal">
+      <h3><span class="check">✓</span> Notes saved</h3>
+      <p id="modalMsg"></p>
+      <div class="row">
+        <button class="primary" id="copyBtn">Copy notes</button>
+        <button id="showJson">Show JSON</button>
+        <button id="closeModal">Close</button>
+      </div>
+      <pre id="jsonOut"></pre>
+    </div>
+  </div>
+
+  <div class="loading" id="loading"><div class="spin"></div><div>Rendering PDF…</div></div>
+
+  <script>
+/*__PDFJS_LIB__*/
+  </script>
+  <script>
+  // Robustness: PDF.js chunks its render loop via requestAnimationFrame, which
+  // browsers throttle in hidden/background tabs — rendering can stall forever if
+  // the file is opened in a tab that isn't visible. Fall back to a timer when the
+  // tab is hidden so rendering always completes; keep native rAF when visible.
+  (function(){
+    var _raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null;
+    var _caf = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : null;
+    window.requestAnimationFrame = function(cb){
+      if(document.hidden || !_raf) return setTimeout(function(){ cb(performance.now()); }, 0);
+      return _raf(cb);
+    };
+    window.cancelAnimationFrame = function(id){ if(_caf){ try{ _caf(id); }catch(e){} } clearTimeout(id); };
+  })();
+
+  (function(){
+    "use strict";
+    const PDF_DATA_B64   = "__PDF_DATA_B64__";
+    const PDF_WORKER_B64 = "__PDF_WORKER_B64__";
+    const PDF_NAME       = "__PDF_NAME__";
+    const NOTES_NAME     = "__NOTES_NAME__";
+
+    function b64ToBytes(b64){
+      const bin = atob(b64); const len = bin.length; const bytes = new Uint8Array(len);
+      for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+      return bytes;
+    }
+
+    // worker from inlined base64 (keeps the file self-contained & offline)
+    const workerBlob = new Blob([b64ToBytes(PDF_WORKER_B64)], {type:"application/javascript"});
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+
+    const viewer = document.getElementById("viewer");
+    const notesEl = document.getElementById("notes");
+    const emptyState = document.getElementById("emptyState");
+    const sideCount = document.getElementById("sideCount");
+    const docCount = document.getElementById("docCount");
+    const selPopup = document.getElementById("selPopup");
+    const submitBtn = document.getElementById("submitBtn");
+    const toastEl = document.getElementById("toast");
+    const zoomPct = document.getElementById("zoomPct");
+
+    let pdfDoc = null;
+    let scale = 1.0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let uid = 0;
+    const annotations = []; // {id,page,quote,note,rects:[{x,y,w,h}]}
+    const pageEls = {};      // page number -> .page element
+
+    // ---- expose hooks for automated verification ----
+    window.__annot = {
+      annotations,
+      payload: () => buildPayload(),
+      addNoteFromText: (pageNum, text) => testAddNote(pageNum, text)
+    };
+
+    let toastTimer;
+    function toast(msg){
+      toastEl.textContent = msg; toastEl.classList.add("show");
+      clearTimeout(toastTimer); toastTimer = setTimeout(()=>toastEl.classList.remove("show"), 2200);
+    }
+
+    function refreshCounts(){
+      const n = annotations.length;
+      sideCount.textContent = n;
+      docCount.textContent = n + (n===1?" note":" notes");
+      submitBtn.disabled = n===0;
+      emptyState.style.display = n===0 ? "" : "none";
+    }
+
+    async function render(){
+      const data = b64ToBytes(PDF_DATA_B64);
+      pdfDoc = await pdfjsLib.getDocument({data}).promise;
+      await renderAllPages();
+      document.getElementById("loading").style.display="none";
+    }
+
+    async function renderAllPages(){
+      viewer.innerHTML = "";
+      for(let n=1;n<=pdfDoc.numPages;n++){
+        await renderPage(n);
+      }
+      // redraw highlights after (re)render
+      annotations.forEach(drawHighlight);
+    }
+
+    async function renderPage(n){
+      const page = await pdfDoc.getPage(n);
+      const viewport = page.getViewport({scale});
+      const pageEl = document.createElement("div");
+      pageEl.className = "page";
+      pageEl.dataset.page = n;
+      pageEl.style.width = viewport.width + "px";
+      pageEl.style.height = viewport.height + "px";
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width*dpr);
+      canvas.height = Math.floor(viewport.height*dpr);
+      canvas.style.width = viewport.width+"px";
+      canvas.style.height = viewport.height+"px";
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr,dpr);
+      pageEl.appendChild(canvas);
+
+      const textLayer = document.createElement("div");
+      textLayer.className = "textLayer";
+      textLayer.style.setProperty("--scale-factor", scale);
+      pageEl.appendChild(textLayer);
+
+      const hlLayer = document.createElement("div");
+      hlLayer.className = "highlightLayer";
+      pageEl.appendChild(hlLayer);
+
+      const num = document.createElement("div");
+      num.className = "pagenum"; num.textContent = "p."+n;
+      pageEl.appendChild(num);
+
+      viewer.appendChild(pageEl);
+      pageEls[n] = pageEl;
+
+      await page.render({canvasContext:ctx, viewport}).promise;
+      const textContent = await page.getTextContent();
+      await pdfjsLib.renderTextLayer({textContent, container:textLayer, viewport, textDivs:[]}).promise;
+    }
+
+    function drawHighlight(ann){
+      const pageEl = pageEls[ann.page];
+      if(!pageEl) return;
+      const hl = pageEl.querySelector(".highlightLayer");
+      const w = pageEl.clientWidth, h = pageEl.clientHeight;
+      ann.rects.forEach(r=>{
+        const d = document.createElement("div");
+        d.className = "note-underline";
+        d.dataset.id = ann.id;
+        d.style.left = (r.x*w)+"px";
+        d.style.top = (r.y*h)+"px";
+        d.style.width = (r.w*w)+"px";
+        d.style.height = (r.h*h)+"px";
+        d.addEventListener("click", ()=>focusNote(ann.id));
+        hl.appendChild(d);
+      });
+    }
+
+    // ---- selection -> popup ----
+    let pendingSel = null; // {page, quote, rects}
+    document.addEventListener("mouseup", (e)=>{
+      if(selPopup.contains(e.target)) return;
+      setTimeout(handleSelection, 0);
+    });
+    function handleSelection(){
+      const sel = window.getSelection();
+      const text = sel && sel.toString().trim();
+      if(!text){ selPopup.style.display="none"; pendingSel=null; return; }
+      const range = sel.getRangeAt(0);
+      let node = range.startContainer;
+      while(node && node.nodeType===3) node = node.parentNode;
+      const pageEl = node && node.closest ? node.closest(".page") : null;
+      if(!pageEl){ selPopup.style.display="none"; return; }
+      const pageNum = parseInt(pageEl.dataset.page,10);
+      const pageRect = pageEl.getBoundingClientRect();
+      const clientRects = [...range.getClientRects()].filter(r=>r.width>0 && r.height>0);
+      if(!clientRects.length){ selPopup.style.display="none"; return; }
+      const rects = clientRects.map(r=>({
+        x:(r.left-pageRect.left)/pageRect.width,
+        y:(r.top -pageRect.top )/pageRect.height,
+        w: r.width/pageRect.width,
+        h: r.height/pageRect.height
+      }));
+      pendingSel = {page:pageNum, quote:text, rects};
+      const last = clientRects[clientRects.length-1];
+      selPopup.style.left = (last.right) + "px";
+      selPopup.style.top  = (last.top - 8) + "px";
+      selPopup.style.display = "block";
+    }
+
+    document.getElementById("addNoteBtn").addEventListener("click", ()=>{
+      if(!pendingSel) return;
+      commitNote(pendingSel);
+      pendingSel = null;
+      selPopup.style.display="none";
+      window.getSelection().removeAllRanges();
+    });
+
+    function commitNote(selData){
+      const ann = {id:++uid, page:selData.page, quote:selData.quote, note:"", rects:selData.rects};
+      annotations.push(ann);
+      drawHighlight(ann);
+      renderSidebar();
+      refreshCounts();
+      const ta = document.querySelector('.note-card[data-id="'+ann.id+'"] textarea');
+      if(ta){ ta.scrollIntoView({block:"center",behavior:"smooth"}); ta.focus(); }
+    }
+
+    // verification helper: add a note for the first text span on a page
+    function testAddNote(pageNum, text){
+      const pageEl = pageEls[pageNum]; if(!pageEl) return null;
+      const span = pageEl.querySelector(".textLayer span");
+      const pageRect = pageEl.getBoundingClientRect();
+      let rects=[{x:0.12,y:0.1,w:0.3,h:0.02}];
+      if(span){ const r=span.getBoundingClientRect();
+        rects=[{x:(r.left-pageRect.left)/pageRect.width,y:(r.top-pageRect.top)/pageRect.height,
+                w:r.width/pageRect.width,h:r.height/pageRect.height}]; }
+      commitNote({page:pageNum, quote:text||(span?span.textContent:"sample"), rects});
+      return annotations[annotations.length-1];
+    }
+
+    function renderSidebar(){
+      // keep existing textarea values; rebuild list
+      const sorted = [...annotations].sort((a,b)=> a.page-b.page || a.rects[0].y-b.rects[0].y);
+      notesEl.querySelectorAll(".note-card").forEach(el=>el.remove());
+      sorted.forEach(ann=>{
+        const card = document.createElement("div");
+        card.className = "note-card"; card.dataset.id = ann.id;
+        const meta = document.createElement("div"); meta.className="meta";
+        const pg = document.createElement("span"); pg.className="pg"; pg.textContent="Page "+ann.page;
+        const del = document.createElement("button"); del.className="del"; del.innerHTML="✕"; del.title="Delete";
+        del.addEventListener("click", ()=>deleteNote(ann.id));
+        meta.appendChild(pg); meta.appendChild(del);
+        const bq = document.createElement("blockquote"); bq.textContent = ann.quote;
+        const ta = document.createElement("textarea");
+        ta.placeholder = "Your note for this text…";
+        ta.value = ann.note;
+        ta.addEventListener("input", ()=>{ ann.note = ta.value; });
+        card.appendChild(meta); card.appendChild(bq); card.appendChild(ta);
+        card.addEventListener("mouseenter", ()=>highlightFor(ann.id,true));
+        card.addEventListener("mouseleave", ()=>highlightFor(ann.id,false));
+        notesEl.appendChild(card);
+      });
+    }
+
+    function highlightFor(id,on){
+      document.querySelectorAll('.note-underline[data-id="'+id+'"]').forEach(el=>el.classList.toggle("active",on));
+    }
+
+    function focusNote(id){
+      const card = document.querySelector('.note-card[data-id="'+id+'"]');
+      if(!card) return;
+      document.querySelectorAll(".note-card.active").forEach(c=>c.classList.remove("active"));
+      card.classList.add("active");
+      card.scrollIntoView({block:"center",behavior:"smooth"});
+      const ta = card.querySelector("textarea"); if(ta) ta.focus();
+      setTimeout(()=>card.classList.remove("active"), 1600);
+    }
+
+    function deleteNote(id){
+      const i = annotations.findIndex(a=>a.id===id);
+      if(i<0) return;
+      annotations.splice(i,1);
+      document.querySelectorAll('.note-underline[data-id="'+id+'"]').forEach(el=>el.remove());
+      renderSidebar(); refreshCounts();
+    }
+
+    // ---- zoom ----
+    async function setZoom(next){
+      scale = Math.min(2.5, Math.max(0.5, next));
+      zoomPct.textContent = Math.round(scale*100)+"%";
+      await renderAllPages();
+    }
+    document.getElementById("zoomIn").addEventListener("click", ()=>setZoom(scale+0.15));
+    document.getElementById("zoomOut").addEventListener("click", ()=>setZoom(scale-0.15));
+
+    // ---- submit ----
+    function buildPayload(){
+      const sorted = [...annotations].sort((a,b)=> a.page-b.page || a.rects[0].y-b.rects[0].y);
+      return {
+        pdf: PDF_NAME,
+        createdAt: new Date().toISOString(),
+        count: sorted.length,
+        annotations: sorted.map((a,i)=>({
+          n:i+1, page:a.page, quote:a.quote, note:(a.note||"").trim()
+        }))
+      };
+    }
+
+    submitBtn.addEventListener("click", submit);
+    async function submit(){
+      if(annotations.length===0){ toast("Add at least one note first"); return; }
+      const payload = buildPayload();
+      const empties = payload.annotations.filter(a=>!a.note).length;
+      if(empties>0){
+        if(!confirm(empties+" note(s) have no text yet. Submit anyway?")) return;
+      }
+      const json = JSON.stringify(payload, null, 2);
+      window.__lastNotesJson = json;
+      // 1) Preferred: hand the notes straight to the local annotation server,
+      //    which writes them next to the PDF and lets Claude act immediately.
+      try{
+        const resp = await fetch("/notes", {method:"POST", headers:{"Content-Type":"application/json"}, body:json});
+        if(resp && resp.ok){ showSent(); return; }
+      }catch(e){ /* opened as a plain file (no server) — fall back to saving */ }
+      // 2) Fallback: save/download the notes file for manual hand-off.
+      let savedVia = "download";
+      if(window.showSaveFilePicker){
+        try{
+          const handle = await window.showSaveFilePicker({
+            suggestedName: NOTES_NAME,
+            types:[{description:"Annotation notes (JSON)", accept:{"application/json":[".json"]}}]
+          });
+          const w = await handle.createWritable(); await w.write(json); await w.close();
+          savedVia = "picker";
+        }catch(err){
+          if(err && err.name==="AbortError") return;
+          downloadJson(json); // fallback
+        }
+      } else {
+        downloadJson(json);
+      }
+      showDone(json, savedVia);
+    }
+
+    function downloadJson(json){
+      const blob = new Blob([json],{type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = NOTES_NAME; document.body.appendChild(a); a.click();
+      a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+
+    // ---- done modal ----
+    const scrim = document.getElementById("scrim");
+    const modalTitle = document.querySelector("#scrim .modal h3");
+    function showSent(){
+      modalTitle.innerHTML = '<span class="check">✓</span> Notes sent to Claude';
+      document.getElementById("modalMsg").innerHTML =
+        "Claude received your notes and is acting on them now — nothing else to do. You can close this tab.";
+      document.getElementById("jsonOut").textContent = window.__lastNotesJson || "";
+      scrim.style.display = "flex";
+    }
+    function showDone(json, via){
+      modalTitle.innerHTML = '<span class="check">✓</span> Notes saved';
+      const msg = document.getElementById("modalMsg");
+      const loc = via==="picker" ? "where you chose" : "your <code>Downloads</code> folder";
+      msg.innerHTML = "Saved <code>"+NOTES_NAME+"</code> to "+loc+
+        ". Return to Claude and say <b>“action my notes”</b> — it will read the file and act on each note.";
+      document.getElementById("jsonOut").textContent = json;
+      window.__lastNotesJson = json;
+      scrim.style.display = "flex";
+    }
+    document.getElementById("closeModal").addEventListener("click", ()=>scrim.style.display="none");
+    scrim.addEventListener("click",(e)=>{ if(e.target===scrim) scrim.style.display="none"; });
+    document.getElementById("showJson").addEventListener("click", ()=>{
+      const pre = document.getElementById("jsonOut");
+      pre.style.display = pre.style.display==="block" ? "none":"block";
+    });
+    document.getElementById("copyBtn").addEventListener("click", async ()=>{
+      try{ await navigator.clipboard.writeText(window.__lastNotesJson||""); toast("Notes copied to clipboard"); }
+      catch(e){ toast("Copy failed — use Show JSON"); }
+    });
+
+    refreshCounts();
+    render().catch(err=>{
+      document.getElementById("loading").innerHTML = "<div style='color:#b6582f;max-width:420px;text-align:center'>Failed to render PDF:<br>"+(err&&err.message||err)+"</div>";
+      console.error(err);
+    });
+  })();
+  </script>
+</body>
+</html>
