@@ -27,8 +27,9 @@ python3 ~/.claude/skills/pdf-annotator/scripts/annotate.py "/path/to/report.pdf"
 Run this **in the background** (the harness will notify you when it exits). It builds the
 viewer, serves it from an ephemeral `127.0.0.1` port, and opens it in the user's browser.
 
-Then tell the user: *select any text to underline it and attach a note in the sidebar;
-press the **✓** button when done — there's nothing to save.*
+Then tell the user: *select any word/phrase — a note box pops up right at it; type the
+note and press **Enter** to save (Esc or click away discards). Press the **✓** button when
+done — there's nothing to save.*
 
 ### 2. Act on the notes — automatic
 
