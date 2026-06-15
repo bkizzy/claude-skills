@@ -32,6 +32,11 @@ def main():
     ap.add_argument("pdf", help="Path to the PDF to annotate")
     ap.add_argument("--timeout", type=int, default=3600,
                     help="Seconds to wait for notes before giving up (default 3600)")
+    ap.add_argument("--port", type=int, default=0,
+                    help="Port to serve on (default 0 = ephemeral). Use a fixed port to "
+                         "show the viewer in the Claude preview pane.")
+    ap.add_argument("--no-browser", action="store_true",
+                    help="Don't open the system browser (e.g. when showing it in Claude's preview).")
     args = ap.parse_args()
 
     pdf_path = os.path.abspath(args.pdf)
@@ -75,7 +80,8 @@ def main():
             time.sleep(0.3)  # let the response flush before we tear down
             httpd.shutdown()
 
-    httpd = socketserver.TCPServer(("127.0.0.1", 0), Handler)
+    socketserver.TCPServer.allow_reuse_address = True
+    httpd = socketserver.TCPServer(("127.0.0.1", args.port), Handler)
     port = httpd.server_address[1]
     url = f"http://127.0.0.1:{port}/{html_name}"
     print(f"SERVING: {url}", flush=True)
@@ -86,7 +92,8 @@ def main():
             httpd.shutdown()
     threading.Thread(target=guard, daemon=True).start()
 
-    webbrowser.open(url)
+    if not args.no_browser:
+        webbrowser.open(url)
     httpd.serve_forever()
 
     if state["done"]:

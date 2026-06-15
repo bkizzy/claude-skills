@@ -9,11 +9,13 @@ juggling.
 1. Builds a **self-contained HTML viewer** for a PDF (PDF.js + its worker + the PDF itself
    are all base64-inlined, so the file works offline with zero external requests).
 2. Serves it from a one-shot `127.0.0.1` server and opens it in your browser.
-3. You select text → a **＋ Add note** popup appears → the text gets underlined and a card
-   shows up in the sidebar where you type your note.
-4. Press the **✓** button. The notes POST back to the local server, which writes
-   `<pdf>.notes.json` next to the PDF and shuts down — and Claude (which launched it as a
-   background task) wakes up and acts on each note.
+3. You select text → the moment the selection settles, the word/phrase is underlined and a
+   **note box pops up right at the selection**. Type your note and press **Enter** to save
+   it (a card also appears in the sidebar). **Esc** or clicking away discards the box *and*
+   removes the underline — so highlights never linger without a note.
+4. Press the **✓** button — that's it, no modal. The notes POST back to the local server,
+   which writes `<pdf>.notes.json` next to the PDF and shuts down; Claude (which launched it
+   as a background task) wakes up and acts on each note.
 
 ## Usage
 
