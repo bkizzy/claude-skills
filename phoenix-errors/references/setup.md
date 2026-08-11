@@ -63,9 +63,21 @@ Ask the user for both values; don't guess the URL.
 
 ## Step 2 — Connect to the chosen client
 
-### Client A: Claude Desktop
+**Ask which client the user is in before writing anything.** Claude Code and Claude Desktop read *different config files* and do not share MCP servers.
 
-Edit (create if absent) `claude_desktop_config.json`:
+> **Cowork is Claude Desktop, not Claude Code.** Cowork runs inside the Claude Desktop app and reads `claude_desktop_config.json` — use **Client A** for it. Running `claude mcp add` for a Cowork user produces a connection that `claude mcp list` reports as healthy while Cowork still shows Phoenix as not connected, because the CLI wrote to `~/.claude.json` and Cowork never reads that file.
+
+If the user works in both, apply both — they're independent.
+
+### Client A: Claude Desktop **or Cowork**
+
+**Preferred: add it through the app's own UI** — Settings → Connectors/Extensions → add an MCP server, with the command and args below. The app writes its own config, which is the only way the entry reliably survives.
+
+> **Do not hand-edit `claude_desktop_config.json` while the app is running.** Claude Desktop owns that file and rewrites it from its in-memory state, silently discarding outside edits — including on quit. An edit can look like it applied (the file reads back correctly) and then vanish minutes later when the app next writes. If you are running *inside* the Desktop app, you cannot quit it to work around this without killing your own session; use the Settings UI instead.
+>
+> Symptom this produces: you write the entry, confirm it, tell the user to restart — and the server still isn't there, because the file was reset in between.
+
+**File-edit fallback** — only when the app is fully quit (verify: `pgrep -f "Claude.app/Contents/MacOS/Claude"` returns nothing). Edit (create if absent) `claude_desktop_config.json`:
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
@@ -91,20 +103,22 @@ Merge a `phoenix` entry into `mcpServers` (preserve any existing servers — rea
 
 For a no-auth local instance, drop the `"--apiKey", "<API_KEY>"` pair entirely.
 
-Then: **fully quit Claude Desktop (Cmd-Q, not just close the window) and reopen it.** MCP servers load at launch.
+Then launch the app. MCP servers load at launch. (If you added it via the Settings UI instead, still **fully quit and reopen** — Cmd-Q, not just closing the window.)
 
-### Client B: Claude Code / Cowork
+Either way, **re-read the config after the app is back up** and confirm the `phoenix` entry is still there before telling the user setup succeeded. If it's gone, the edit was clobbered — redo it through the Settings UI.
 
-One command — no file editing. Run it for the user (or print it to run themselves):
+### Client B: Claude Code (the `claude` CLI)
+
+**Not for Cowork — see the note above.** One command, no file editing. Run it for the user (or print it to run themselves):
 
 ```bash
-claude mcp add phoenix -- npx -y @arizeai/phoenix-mcp@latest \
+claude mcp add phoenix --scope user -- npx -y @arizeai/phoenix-mcp@latest \
   --baseUrl <BASE_URL> --apiKey <API_KEY>
 ```
 
 Drop `--apiKey <API_KEY>` for a no-auth local instance.
 
-- Add `--scope user` to make it available across all projects (default scope is the current project via `.mcp.json`).
+- `--scope user` writes to `~/.claude.json` and makes it available across all projects. Without it the default scope is the current project only, via `.mcp.json` — which also means it lands in the user's repo, so prefer `--scope user` unless they explicitly want it committed.
 - Verify with `claude mcp list` — `phoenix` should show as connected.
 
 > The API key ends up in the client config / shell history, never in the skill. Don't commit it.
@@ -120,6 +134,8 @@ Call `mcp__phoenix__list-projects`. Success = an array of projects (even an empt
 | Symptom | Likely cause / fix |
 |---|---|
 | Tools never appear in Claude Desktop | Didn't fully quit/reopen; or JSON is malformed (validate it). |
+| Entry was written to `claude_desktop_config.json`, but `mcpServers` is empty when re-read | The app was running and overwrote the file from its in-memory state. Add the server through Settings → Connectors/Extensions instead, or quit the app fully before editing. |
+| `claude mcp list` says connected, but Cowork/Desktop says it isn't | Wrote to the wrong config. The CLI writes `~/.claude.json`; Cowork and Desktop read `claude_desktop_config.json`. Add the entry there too (Client A), then fully quit and reopen. |
 | `401 / 403 / unauthorized` | Wrong or missing apiKey; key lacks read scope; key from a different instance than baseUrl. |
 | `ECONNREFUSED` / timeout (local) | `phoenix serve` / docker isn't running, or wrong port. |
 | `npx` not found | Node.js not installed. |

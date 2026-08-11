@@ -79,13 +79,17 @@ You now have the **baseUrl**. Get the **apiKey** based on the detected flavor (s
 
 ### A4 — Wire it into the chosen client
 
-Apply the connection per `references/setup.md`:
-- **Claude Desktop:** merge a `phoenix` entry into the `mcpServers` block of `claude_desktop_config.json`, then tell the user to fully quit and reopen Claude Desktop.
-- **Claude Code / Cowork:** run the `claude mcp add` command for them (or print it to run).
+Ask which client they're in first — Claude Code and Claude Desktop read different config files and don't share MCP servers. Apply the connection per `references/setup.md`:
+- **Claude Desktop *or Cowork*:** add the server via the app's **Settings → Connectors/Extensions** UI, then have the user fully quit and reopen. Hand-editing `claude_desktop_config.json` while the app is running does *not* stick — the app rewrites that file from memory and silently drops outside edits. Only fall back to a file edit if the app is fully quit.
+- **Claude Code (the `claude` CLI):** run the `claude mcp add --scope user` command for them (or print it to run).
+
+**Cowork is Claude Desktop, not Claude Code.** `claude mcp add` for a Cowork user yields a server that `claude mcp list` calls connected while Cowork still shows Phoenix as unavailable — the CLI writes `~/.claude.json`, which Cowork never reads. If the user works in both, apply both.
 
 ### A5 — Verify
 
 After the client reconnects, confirm by calling `mcp__phoenix__list-projects`. If it returns projects, setup succeeded — continue to Phase B. If not, re-check the baseUrl/apiKey against `references/setup.md` troubleshooting.
+
+Never report success from the config write alone. On Desktop/Cowork, **re-read the config file after the restart** and confirm the entry survived before verifying tools — a write that reads back correctly can still be discarded by the app minutes later. If the tools are missing, check whether `mcpServers` is empty before blaming the URL or key.
 
 ---
 
