@@ -2,12 +2,14 @@
 
 This covers Phase B steps B4–B5: how to call `get-spans`, how to map raw span attributes onto the flat record the renderer expects, and the exact `spans.json` / `analysis.json` schemas.
 
-## 1. Calling `get-spans`
+## 1. Fetching spans
 
-Per selected project:
+`<SRV>` = the detected server prefix (e.g. `mcp__lunafit_phoenix__`). Never assume `mcp__phoenix__` — see SKILL.md A1.
+
+### Legacy surface
 
 ```
-mcp__phoenix__get-spans(
+<SRV>get-spans(
   project_identifier = "<project name>",
   status_codes       = ["ERROR"],
   start_time         = "<ISO-8601 UTC>",
@@ -17,6 +19,48 @@ mcp__phoenix__get-spans(
 ```
 
 The response is `{ spans: [...], nextCursor? }`. If `nextCursor` is present, call again with `cursor = nextCursor` and keep appending until it's gone. (A quiet project usually fits in one page; don't assume — follow the cursor.)
+
+### Code-mode surface (Phoenix 19+ default)
+
+There is no `get-spans` tool. You call `<SRV>execute` with Python in which `call_tool(name, params)` is the only function in scope. Confirm the tool's real name and parameters first — `<SRV>list_tools`, or `<SRV>get_schema` for one tool. Names differ from the legacy surface and guessing wastes a sandbox run.
+
+Do the pagination **and** the flattening inside the sandbox, and return only the compact records:
+
+```python
+rows, cursor = [], None
+while True:
+    params = {"project_identifier": PROJECT, "status_codes": ["ERROR"],
+              "start_time": START, "end_time": END, "limit": 1000}
+    if cursor:
+        params["cursor"] = cursor
+    resp = call_tool("<real span tool name>", params)
+    for s in resp["spans"]:
+        exc = next((e for e in s.get("events", []) if e.get("name") == "exception"), {})
+        ea, a = exc.get("attributes", {}), s.get("attributes", {})
+        rows.append({
+            "project": PROJECT,
+            "span_id": s["context"]["span_id"], "trace_id": s["context"]["trace_id"],
+            "start_time": s["start_time"], "end_time": s["end_time"],
+            "name": s["name"], "span_kind": s["span_kind"], "status": s["status_code"],
+            "user_id": a.get("user.id", ""), "session_id": a.get("session.id", ""),
+            "model": a.get("llm.model_name", ""),
+            "exception_type": ea.get("exception.type", ""),
+            "exception_message": (ea.get("exception.message") or s.get("status_message") or "")[:300],
+            "prompt_tokens": a.get("llm.token_count.prompt"),
+            "completion_tokens": a.get("llm.token_count.completion"),
+            "total_tokens": a.get("llm.token_count.total"),
+        })
+    cursor = resp.get("nextCursor")
+    if not cursor:
+        break
+rows
+```
+
+This is the big win of code mode: the multi-megabyte span payloads stay in the sandbox and only the flat rows cross into context, so the overflow handling below rarely triggers.
+
+**Respect the sandbox bounds** — 30s wall clock, 100 MB memory, ≤50 tool calls per run. A busy project will blow the clock before it blows the row count. When that happens, split the time window and run once per slice rather than raising `limit`; merge the slices client-side. If you cap anything, say so in the report — a silent truncation reads as a complete pull.
+
+Add `"instance": "<server name>"` to each row when more than one Phoenix instance is in play.
 
 ### Handling high-volume / overflow projects
 

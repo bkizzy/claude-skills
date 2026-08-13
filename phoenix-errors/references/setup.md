@@ -63,6 +63,38 @@ Ask the user for both values; don't guess the URL.
 
 ## Step 2 — Connect to the chosen client
 
+### Which connection method?
+
+Check the version first — `curl -s <baseUrl>/arize_phoenix_version`:
+
+| Version | Method | What it needs |
+|---|---|---|
+| **≥ 19.0.0** | **Remote MCP** — built into Phoenix at `<baseUrl>/mcp` | a URL + browser OAuth login |
+| **< 19.0.0** | Legacy `@arizeai/phoenix-mcp` stdio package | an API key, `npx`, and client-specific config |
+
+**Default to remote.** The stdio package is in maintenance mode — bug fixes only, no new capabilities. For a user on an older Phoenix, offer the upgrade before walking them through the legacy path; it is usually less total work.
+
+### Remote MCP (preferred)
+
+Pick a **distinct server name** per instance — `lunafit_phoenix`, not `phoenix`. Second instances are common and renaming later breaks every reference to the old prefix.
+
+- **Claude Desktop / Cowork:** Settings → Connectors → **Add custom connector**, name + URL `<baseUrl>/mcp`. Browser login opens on first use. Fully quit and reopen.
+- **Claude Code:**
+
+  ```bash
+  claude mcp add --transport http <name> --scope user <baseUrl>/mcp
+  ```
+
+  Then `/mcp` in an interactive session → select the server → complete the login.
+
+Repeat per instance; they coexist and their tools stay namespaced by server name.
+
+If auth is disabled on the deployment, `/mcp` is reachable with no login at all.
+
+---
+
+## Legacy: stdio package (Phoenix < 19.0.0)
+
 **Ask which client the user is in before writing anything.** Claude Code and Claude Desktop read *different config files* and do not share MCP servers.
 
 > **Cowork is Claude Desktop, not Claude Code.** Cowork runs inside the Claude Desktop app and reads `claude_desktop_config.json` — use **Client A** for it. Running `claude mcp add` for a Cowork user produces a connection that `claude mcp list` reports as healthy while Cowork still shows Phoenix as not connected, because the CLI wrote to `~/.claude.json` and Cowork never reads that file.
@@ -127,7 +159,7 @@ Drop `--apiKey <API_KEY>` for a no-auth local instance.
 
 ## Step 3 — Verify the connection
 
-Call `mcp__phoenix__list-projects`. Success = an array of projects (even an empty `default` is fine — it proves the link works).
+Call `<SRV>list_tools` (code-mode) or `<SRV>list-projects` (legacy), where `<SRV>` is the server's actual prefix. Success = a real response; an array of projects, even an empty `default`, proves the link works. A server that merely *appears* in `claude mcp list` proves nothing — see the 401 and "Needs authentication" rows below.
 
 ### Troubleshooting
 
@@ -135,7 +167,11 @@ Call `mcp__phoenix__list-projects`. Success = an array of projects (even an empt
 |---|---|
 | Tools never appear in Claude Desktop | Didn't fully quit/reopen; or JSON is malformed (validate it). |
 | Entry was written to `claude_desktop_config.json`, but `mcpServers` is empty when re-read | The app was running and overwrote the file from its in-memory state. Add the server through Settings → Connectors/Extensions instead, or quit the app fully before editing. |
-| `claude mcp list` says connected, but Cowork/Desktop says it isn't | Wrote to the wrong config. The CLI writes `~/.claude.json`; Cowork and Desktop read `claude_desktop_config.json`. Add the entry there too (Client A), then fully quit and reopen. |
+| `claude mcp list` says connected, but Cowork/Desktop says it isn't | Wrote to the wrong config. The CLI writes `~/.claude.json`; Cowork and Desktop read `claude_desktop_config.json`. Add the entry there too, then fully quit and reopen. |
+| Server shows **✔ Connected** but every call 401s | For stdio, "connected" only means the process launched — the API key is never validated. Test with a real call (`curl -s -w '%{http_code}' <baseUrl>/v1/projects -H "Authorization: Bearer <key>"`); a revoked or wrong-instance key returns 401 while the server still reports healthy. |
+| Server shows **! Needs authentication** | Remote MCP, not yet logged in. Run `/mcp` in an interactive `claude` session and complete the browser login. Not a config problem — don't redo setup. |
+| `<baseUrl>/mcp` responds the same as a made-up path | The `/mcp` endpoint isn't mounted: Phoenix < 19.0.0, or `PHOENIX_ENABLE_MCP_SERVER=false`. Check `curl -s <baseUrl>/arize_phoenix_version`. |
+| Expected `get-spans`/`list-projects`, got `execute`/`search`/`get_schema` | That's code mode, the Phoenix 19+ default — not a broken server. Drive it through `execute`, or set `PHOENIX_ENABLE_MCP_CODE_MODE=false` for the legacy tool list. |
 | `401 / 403 / unauthorized` | Wrong or missing apiKey; key lacks read scope; key from a different instance than baseUrl. |
 | `ECONNREFUSED` / timeout (local) | `phoenix serve` / docker isn't running, or wrong port. |
 | `npx` not found | Node.js not installed. |
