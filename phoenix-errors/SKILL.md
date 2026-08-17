@@ -14,7 +14,7 @@ description: >
   report", "arize error report", "LLM trace errors", "observability error report",
   or wants to analyze errors/failures across their Phoenix projects — even if they
   don't say the exact phrase.
-version: 0.2.0
+version: 0.2.1
 ---
 
 # `/phoenix-errors` — connect Phoenix to Claude + error report
@@ -49,18 +49,21 @@ If invoked with no args, run the full flow.
 
 ### A1 — Detect connected instances and their tool surface
 
-**Never hardcode the server name `phoenix`.** Users name their servers freely, and users with more than one instance *must* (`lunafit_phoenix`, `mom_phoenix`, `phoenix-prod`…). Scan the available tools for any server whose name contains `phoenix` (case-insensitive), ignoring `phoenix-docs` — that's the documentation server, not a data server.
+**Identify Phoenix by what a server can do, not by what it is called.** Server names are unreliable: users rename freely, users with two instances *must* (`lunafit_phoenix`, `mom_phoenix`), and **connectors added through the Claude app's Settings → Connectors are registered under opaque UUIDs** — `mcp__1bb330a2-5dc2-…__execute` — with no "phoenix" anywhere in the name. A name-substring check silently finds nothing on exactly the setup the current instructions recommend.
 
-Record, for each match, the **server prefix** (e.g. `mcp__lunafit_phoenix__`). Everything in Phase B is called through that prefix; `<SRV>` below means "the prefix of the instance you're working with."
+So: for each candidate server exposing a `list_tools`/`search`/`execute` trio or hyphenated `get-spans`-style tools, call its `list_tools`. It is a Phoenix **data** server if the catalogue contains span/project operations (`getSpans`/`getProjects`, or `get-spans`/`list-projects`). Exclude the docs server — it returns documentation search tools and no span operations. Record the **server prefix** of each match; `<SRV>` below means "the prefix of the instance you're working with."
 
-Then identify the **tool surface**, because Phoenix exposes two and they share no call signatures:
+The catalogue also tells you the **surface**, which decides every call signature in Phase B:
 
-| Surface | Tell-tale tools | Where it comes from |
+| Surface | What `list_tools` returns | Calls go through |
 |---|---|---|
-| **Code-mode** (default, Phoenix 19+) | `<SRV>execute`, `<SRV>search`, `<SRV>get_schema`, `<SRV>list_tools` | the built-in remote server at `/mcp` |
-| **Legacy** | `<SRV>list-projects`, `<SRV>get-spans`, `<SRV>get-trace` | the `@arizeai/phoenix-mcp` stdio package, or a remote server with `PHOENIX_ENABLE_MCP_CODE_MODE=false` |
+| **Remote, REST-mapped** (Phoenix 19+, most common) | `getProjects`, `getSpans`, `spanSearch`, `listProjectTraces`, plus datasets/experiments/prompts | `<SRV>execute` with `await call_tool("getSpans", {...})` |
+| **Remote, restricted code-mode** | only `search`, `get_schema`, `tags`, `list_tools`, `execute` | `<SRV>execute`, after `search`/`get_schema` to discover real names |
+| **Legacy stdio** | `list-projects`, `get-spans`, `get-trace` as direct MCP tools | called directly, e.g. `<SRV>get-spans(...)` |
 
-Branch on what's actually present — don't infer the surface from how the server was configured. A remote server with code mode disabled presents the legacy tools.
+Branch on what is actually present. Never infer the surface from how the server was configured, and never assume the hyphenated legacy names exist on a remote server — the REST-mapped surface uses `getSpans`, not `get-spans`.
+
+**Then name the instances for the user.** UUID-named connectors are meaningless in conversation, so call `getProjects` on each and identify it by its project list (“the one with `lunafit_prod` and 31 others” vs “the 4-project one”). Use that description, not the UUID, everywhere you refer to it.
 
 Outcomes:
 
@@ -68,7 +71,9 @@ Outcomes:
 - **Exactly one** → note its prefix and surface, tell the user which instance you're using, skip to Phase B.
 - **More than one** → list them and ask which to report on. Offer "all of them" as an option; a combined report across instances is supported and often the point (prod vs stage). Carry the chosen prefixes through Phase B.
 
-If a server is present but calls fail with an auth error, treat it as **not connected** and say so specifically — "`lunafit_phoenix` is registered but not authenticated; run `/mcp` in an interactive `claude` session and log in" — rather than dropping into full setup. A registered-but-unauthenticated server is a login problem, not a configuration problem.
+If a server is present but calls fail with an auth error, that is a login problem, not a configuration problem — say so specifically ("registered but not authenticated; log in via the app's Connectors settings, or `/mcp` in an interactive `claude` session") rather than dropping into full setup.
+
+**Before reporting anything as unauthenticated, check the tools you actually have.** Claude Code's registry and the Claude app's connectors are independent: a server can show `! Needs authentication` in `claude mcp list` while a working connector for the *same instance* is already attached to the session under a UUID name. Trust a live tool call over any registry listing — a successful `getProjects` proves the connection regardless of what any list says.
 
 ### A2 — Ask for the URL first, then detect the flavor
 
@@ -133,7 +138,7 @@ Two things have to be true, and the first does not imply the second:
 
 `claude mcp list` reporting **✔ Connected** only means the transport opened. For legacy stdio it means the process launched — it does **not** validate the API key, so a revoked key shows as connected and fails on every call. For remote servers an unauthenticated entry shows **! Needs authentication**; that's a login step, not a broken setup.
 
-So verify with a real call: `<SRV>list_tools` (code-mode) or `<SRV>list-projects` (legacy). If it returns, setup succeeded — continue to Phase B. On a 401, send the user to `/mcp` to log in. On other failures, check `references/setup.md` troubleshooting.
+So verify with a real call: `<SRV>execute` running `getProjects` (remote) or `<SRV>list-projects` (legacy stdio). If it returns projects, setup succeeded — continue to Phase B. On a 401, send the user to log in via the app's Connectors settings or `/mcp`. On other failures, check `references/setup.md` troubleshooting.
 
 Never report success from a config write alone. On Desktop/Cowork, **re-read the config after the restart** and confirm the entry survived — a write that reads back correctly can still be discarded by the app minutes later.
 
@@ -145,8 +150,11 @@ Everything below runs against the prefix(es) and surface you established in A1. 
 
 ### B1 — List projects
 
-- **Legacy:** `<SRV>list-projects`
-- **Code-mode:** `<SRV>execute` with `call_tool("list_projects", {})`. If the tool name isn't obvious, call `<SRV>list_tools` (or `<SRV>search` with "projects") first — don't guess names, the surface is discoverable for exactly this reason.
+- **Remote (REST-mapped):** `<SRV>execute` with `await call_tool("getProjects", {})`
+- **Remote (restricted code-mode):** `<SRV>list_tools` or `<SRV>search` "projects" first to get the real name, then `execute`
+- **Legacy stdio:** `<SRV>list-projects` directly
+
+Read the name off the catalogue rather than guessing — the remote surface uses `getProjects`/`getSpans` and the legacy one `list-projects`/`get-spans`, and calling the wrong pair fails with a bare tool-not-found that reads like a broken connection.
 
 You get an array of `{id, name, description}`. Keep the names — they're what the user picks from and what you pass back as `project_identifier`.
 

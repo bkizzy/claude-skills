@@ -159,7 +159,9 @@ Drop `--apiKey <API_KEY>` for a no-auth local instance.
 
 ## Step 3 — Verify the connection
 
-Call `<SRV>list_tools` (code-mode) or `<SRV>list-projects` (legacy), where `<SRV>` is the server's actual prefix. Success = a real response; an array of projects, even an empty `default`, proves the link works. A server that merely *appears* in `claude mcp list` proves nothing — see the 401 and "Needs authentication" rows below.
+Call `<SRV>execute` running `getProjects` (remote) or `<SRV>list-projects` (legacy stdio), where `<SRV>` is the server's actual prefix. Success = an array of projects; even an empty `default` proves the link works.
+
+Registry listings prove nothing in either direction. A server that merely *appears* in `claude mcp list` may not be authenticated — and one listed there as `! Needs authentication` may be a stale duplicate of a connector that is already live in the session under a different name. Only a returning tool call settles it.
 
 ### Troubleshooting
 
@@ -171,7 +173,9 @@ Call `<SRV>list_tools` (code-mode) or `<SRV>list-projects` (legacy), where `<SRV
 | Server shows **✔ Connected** but every call 401s | For stdio, "connected" only means the process launched — the API key is never validated. Test with a real call (`curl -s -w '%{http_code}' <baseUrl>/v1/projects -H "Authorization: Bearer <key>"`); a revoked or wrong-instance key returns 401 while the server still reports healthy. |
 | Server shows **! Needs authentication** | Remote MCP, not yet logged in. Run `/mcp` in an interactive `claude` session and complete the browser login. Not a config problem — don't redo setup. |
 | `<baseUrl>/mcp` responds the same as a made-up path | The `/mcp` endpoint isn't mounted: Phoenix < 19.0.0, or `PHOENIX_ENABLE_MCP_SERVER=false`. Check `curl -s <baseUrl>/arize_phoenix_version`. |
-| Expected `get-spans`/`list-projects`, got `execute`/`search`/`get_schema` | That's code mode, the Phoenix 19+ default — not a broken server. Drive it through `execute`, or set `PHOENIX_ENABLE_MCP_CODE_MODE=false` for the legacy tool list. |
+| Expected `get-spans`/`list-projects`, got `execute`/`search`/`get_schema` | That's the remote server, the Phoenix 19+ default — not a broken one. Drive it through `execute`; its real tool names are `getSpans`/`getProjects`, not the hyphenated legacy ones. |
+| No server name contains "phoenix", so detection finds nothing | Connectors added via the app's Settings → Connectors are registered under UUIDs. Detect by capability — call `list_tools` and look for span/project operations — never by name substring. |
+| `claude mcp list` says `! Needs authentication` but Phoenix tools work anyway | Two independent registries. The app's connectors and Claude Code's config are separate; a stale duplicate in one does not affect a live connector in the other. Delete the duplicate to stop the false alarm. |
 | `401 / 403 / unauthorized` | Wrong or missing apiKey; key lacks read scope; key from a different instance than baseUrl. |
 | `ECONNREFUSED` / timeout (local) | `phoenix serve` / docker isn't running, or wrong port. |
 | `npx` not found | Node.js not installed. |

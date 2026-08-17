@@ -20,9 +20,9 @@ This covers Phase B steps B4–B5: how to call `get-spans`, how to map raw span 
 
 The response is `{ spans: [...], nextCursor? }`. If `nextCursor` is present, call again with `cursor = nextCursor` and keep appending until it's gone. (A quiet project usually fits in one page; don't assume — follow the cursor.)
 
-### Code-mode surface (Phoenix 19+ default)
+### Remote surface (Phoenix 19+ default)
 
-There is no `get-spans` tool. You call `<SRV>execute` with Python in which `call_tool(name, params)` is the only function in scope. Confirm the tool's real name and parameters first — `<SRV>list_tools`, or `<SRV>get_schema` for one tool. Names differ from the legacy surface and guessing wastes a sandbox run.
+There is no `get-spans` tool. You call `<SRV>execute` with Python in which `call_tool(name, params)` is the only function in scope. On the common REST-mapped catalogue the span tools are **`getSpans`** and **`spanSearch`**, projects are **`getProjects`**, and traces **`listProjectTraces`** — camelCase REST operation ids, not the hyphenated legacy names. Confirm against `<SRV>list_tools` (or `<SRV>get_schema` for one tool) before the first real call; a restricted deployment exposes only `search`/`get_schema`/`execute` and you must discover names through those.
 
 Do the pagination **and** the flattening inside the sandbox, and return only the compact records:
 
@@ -33,7 +33,7 @@ while True:
               "start_time": START, "end_time": END, "limit": 1000}
     if cursor:
         params["cursor"] = cursor
-    resp = call_tool("<real span tool name>", params)
+    resp = await call_tool("getSpans", params)   # confirm the name against list_tools first
     for s in resp["spans"]:
         exc = next((e for e in s.get("events", []) if e.get("name") == "exception"), {})
         ea, a = exc.get("attributes", {}), s.get("attributes", {})
